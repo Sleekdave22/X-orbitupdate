@@ -1,0 +1,20 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync(__dirname+'/index.html','utf8'),market=fs.readFileSync(__dirname+'/market.js','utf8');
+new vm.Script(market);
+for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
+assert.equal((html.match(/id="marketTab"/g)||[]).length,1);
+assert(html.includes('el("marketTab").hidden=!account||activeScreen!=="contacts"'));
+const message=market.slice(market.indexOf('async function message('),market.indexOf('async function report('));
+const deep=html.slice(html.indexOf('async function openMarketSellerChat('),html.indexOf("el('marketTab').onclick"));
+(async()=>{
+ let routed='',requested=[],failure=false,notice='';
+ const c={native:false,encodeURIComponent,api:async(path,body)=>{requested.push([path,body]);if(failure)throw Error('Account interaction unavailable')},location:{assign:x=>routed=x},say:x=>notice=x};
+ vm.createContext(c);vm.runInContext(message,c);await c.message('seller/id','Seller');assert.equal(routed,'/?chat=seller%2Fid');assert.deepEqual(requested[0],['/contacts',{code:'seller/id'}]);
+ routed='';failure=true;await c.message('blocked','Blocked');assert.equal(routed,'');assert(notice.includes('unavailable'));
+ failure=false;c.native=true;c.GuardianGaming={openChat:(id,name)=>routed=id+':'+name};await c.message('native','Seller');assert.equal(routed,'native:Seller');
+ let opened=null,resolve;
+ const d={URLSearchParams,account:{id:'owner'},activeScreen:'contacts',location:{search:'?chat=seller',pathname:'/'},history:{replaceState(){}},api:async()=>({users:[{id:'seller',name:'Seller'}]}),openChat:u=>opened=u.id,error:x=>notice=x};
+ vm.createContext(d);vm.runInContext(deep,d);await d.openMarketSellerChat();assert.equal(opened,'seller');
+ opened=null;d.api=()=>new Promise(r=>resolve=r);const task=d.openMarketSellerChat();d.account={id:'another'};resolve({users:[{id:'seller'}]});await task;assert.equal(opened,null);
+ console.log('Market syntax, home-only entry, web/native seller routing, blocked contacts and stale-account checks passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

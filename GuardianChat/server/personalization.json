@@ -1,0 +1,164 @@
+[
+  {
+    "id": "orbit-cyan-navy",
+    "name": "Orbit violet / Blue",
+    "roles": 2,
+    "accent": "#7C3AED",
+    "bubble": "#7C3AED",
+    "ink": "#FFFFFF",
+    "received": "#202546",
+    "receivedInk": "#F1F5F9",
+    "headingDark": "#22D3EE",
+    "headingLight": "#0E7490",
+    "aliases": []
+  },
+  {
+    "id": "oxblood-gold",
+    "name": "Gold / Oxblood",
+    "roles": 2,
+    "accent": "#e8b84a",
+    "bubble": "#e8b84a",
+    "ink": "#24170a",
+    "received": "#341923",
+    "receivedInk": "#f4eee6",
+    "headingDark": "#e8b84a",
+    "headingLight": "#2a0d12",
+    "aliases": []
+  },
+  {
+    "id": "oxblood-first-gold",
+    "name": "Oxblood / Gold",
+    "roles": 2,
+    "accent": "#6a1833",
+    "bubble": "#6a1833",
+    "ink": "#fff5f7",
+    "received": "#e8b84a",
+    "receivedInk": "#24170a",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#6a1833",
+    "aliases": []
+  },
+  {
+    "id": "blue-gold",
+    "name": "Blue / Gold",
+    "roles": 2,
+    "accent": "#2458bc",
+    "bubble": "#2458bc",
+    "ink": "#ffffff",
+    "received": "#e8b84a",
+    "receivedInk": "#24170a",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#2458bc",
+    "aliases": [
+      "ocean",
+      "royal-blue-gold",
+      "navy-coral",
+      "cobalt-lemon"
+    ]
+  },
+  {
+    "id": "red-sky-blue",
+    "name": "Red / Sky blue",
+    "roles": 2,
+    "accent": "#c62828",
+    "bubble": "#c62828",
+    "ink": "#ffffff",
+    "received": "#91d4f2",
+    "receivedInk": "#102635",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#c62828",
+    "aliases": [
+      "crimson-gold",
+      "crimson-sky"
+    ]
+  },
+  {
+    "id": "green-pink",
+    "name": "Green / Pink",
+    "roles": 2,
+    "accent": "#1d7148",
+    "bubble": "#1d7148",
+    "ink": "#ffffff",
+    "received": "#f2c0d5",
+    "receivedInk": "#351623",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#1d7148",
+    "aliases": [
+      "forest",
+      "emerald-gold",
+      "teal-amber"
+    ]
+  },
+  {
+    "id": "pink-matte-black",
+    "name": "Pink / Matte black",
+    "roles": 2,
+    "accent": "#f29abb",
+    "bubble": "#f29abb",
+    "ink": "#351623",
+    "received": "#222224",
+    "receivedInk": "#f4eee6",
+    "headingDark": "#f29abb",
+    "headingLight": "#2a0d12",
+    "aliases": [
+      "rose"
+    ]
+  },
+  {
+    "id": "purple-lemon",
+    "name": "Purple / Lemon",
+    "roles": 2,
+    "accent": "#713c98",
+    "bubble": "#713c98",
+    "ink": "#ffffff",
+    "received": "#ffe49a",
+    "receivedInk": "#302140",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#713c98",
+    "aliases": [
+      "violet",
+      "amethyst-gold"
+    ]
+  },
+  {
+    "id": "matte-black-sky",
+    "name": "Matte black / Sky blue",
+    "roles": 2,
+    "accent": "#222224",
+    "bubble": "#222224",
+    "ink": "#f4eee6",
+    "received": "#91d4f2",
+    "receivedInk": "#102635",
+    "headingDark": "#f7ecdd",
+    "headingLight": "#222224",
+    "aliases": [
+      "slate"
+    ]
+  },
+  {
+    "id": "sky-blue-oxblood",
+    "name": "Sky blue / Oxblood",
+    "roles": 2,
+    "accent": "#91d4f2",
+    "bubble": "#91d4f2",
+    "ink": "#102635",
+    "received": "#6a1833",
+    "receivedInk": "#fff5f7",
+    "headingDark": "#91d4f2",
+    "headingLight": "#2a0d12",
+    "aliases": []
+  },
+  {
+    "id": "charcoal-black",
+    "name": "Charcoal / Black",
+    "roles": 2,
+    "accent": "#262626",
+    "bubble": "#262626",
+    "ink": "#F1F5F9",
+    "received": "#000000",
+    "receivedInk": "#F1F5F9",
+    "headingDark": "#F1F5F9",
+    "headingLight": "#262626",
+    "aliases": []
+  }
+]

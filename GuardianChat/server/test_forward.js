@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),crypto=require('crypto');
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const source=html.slice(html.indexOf('async function sendForward(){'),html.indexOf("el('draft').addEventListener('paste'",html.indexOf('async function sendForward(){')));
-const nodes={previewCaption:{value:'Shared caption'},previewOnce:{checked:true},previewProtected:{checked:false},sendMedia:{disabled:false},outName:{textContent:''},draft:{value:'Shared caption'},once:{checked:true}};
+const nodes={previewOnce:{checked:true},previewProtected:{checked:false},sendMedia:{disabled:false},outName:{textContent:''},draft:{value:'Shared caption'},once:{checked:true}};
 const requests=[];let fail=true;
 const context={crypto,forwardTargets:[{id:'first',name:'First'},{id:'second',name:'Second'}],pendingFile:null,previewVoice:null,voiceRecorder:null,voiceStarting:false,busy:false,el:id=>nodes[id],api:async(path,body)=>{requests.push(body);if(body.peer==='second'&&fail)throw Error('offline')},error:()=>{},messages:()=>{},closeOutgoing:()=>{context.forwardTargets=null},peopleSignature:''};
 vm.createContext(context);vm.runInContext(source,context);

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="referrer" content="no-referrer">
+ <title>Join X ORBIT</title>
+ <link rel="icon" href="/branding/XOrbit-app-icon-1024.png?v=20">
+ <script src="/orbit-theme.js"></script>
+ <link rel="stylesheet" href="/gaming.css">
+ <link rel="stylesheet" href="/orbit-theme.css">
+ <script defer src="/join.js"></script>
+ <style>
+  .join-page{width:min(100%,460px);padding:24px 18px;margin:clamp(12px,5vh,48px) auto}
+  .join-brand{display:flex;align-items:center;gap:14px;margin-bottom:26px}.join-brand img{width:64px;height:64px;object-fit:contain}.join-brand h1{font-size:26px;color:var(--ink)}.join-brand p{margin:4px 0;font-size:13px;color:var(--muted)}
+  .join-card{padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--paper)}.join-card h2{font-size:23px;margin:0 0 8px}.join-card>p{font-size:14px;line-height:1.5}.join-card fieldset{border:0;margin:18px 0 0;padding:0;min-width:0}.join-card label{font-size:14px}.join-card input{font-size:16px;margin-bottom:16px}.join-card small{display:block;font-size:12px;margin:-7px 0 16px;line-height:1.5}
+  .join-password{display:flex;align-items:center;gap:6px;margin-bottom:16px}.join-password input{flex:1;min-width:0;margin:5px 0 0}.join-password button{flex:0 0 auto;font-size:12px;min-width:58px;margin:5px 0 0;padding:10px 9px;color:var(--ink);background:var(--surface)}
+  .join-page button{color:var(--ink)}.join-page .join-submit{width:100%;min-height:44px;font-weight:600;background:var(--orbit-action);color:var(--orbit-on-action)}.join-page button:disabled{background:var(--surface);color:var(--muted)}.join-page a{display:inline-block;font-size:14px}.join-status{min-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}.join-actions{margin-top:18px}.join-actions button{margin:8px 8px 8px 0}.join-footer{margin-top:22px;font-size:11px;color:var(--muted);text-align:left}.join-error{color:var(--ink)}
+ </style>
+</head>
+<body>
+ <main class="join-page">
+  <div class="join-brand"><img src="/branding/XOrbit-app-icon-1024.png?v=20" alt=""><div><h1>X ORBIT</h1><p>Your world. Your connection.</p></div></div>
+  <section class="join-card" aria-labelledby="joinHeading">
+   <h2 id="joinHeading">Join X ORBIT</h2>
+   <p id="joinIntro" class="muted">Create your account to chat, connect and play.</p>
+   <p id="joinStatus" class="join-status" role="status" aria-live="polite">Checking your invitation…</p>
+   <form id="joinForm" hidden novalidate>
+    <fieldset id="joinFields" disabled>
+     <label for="joinName">Display name</label><input id="joinName" name="name" autocomplete="name" maxlength="40" required>
+     <label for="joinNickname">Nickname</label><input id="joinNickname" name="nickname" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="25" required aria-describedby="nicknameHint"><small id="nicknameHint">3–24 letters, numbers or underscores. Your public @name.</small>
+     <label for="joinPassword">Password</label><div class="join-password"><input id="joinPassword" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required aria-describedby="passwordHint"><button id="showJoinPassword" type="button" aria-label="Show password" aria-pressed="false" aria-controls="joinPassword">Show</button></div><small id="passwordHint">Use 10–128 characters. Keep this password for future sign-ins.</small>
+     <label for="joinConfirm">Confirm password</label><div class="join-password"><input id="joinConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required><button id="showJoinConfirm" type="button" aria-label="Show confirm password" aria-pressed="false" aria-controls="joinConfirm">Show</button></div>
+     <button id="joinSubmit" class="join-submit" type="submit" disabled>Create account →</button>
+    </fieldset>
+   </form>
+   <div class="join-actions"><button id="retryInvite" type="button" hidden>Check invitation again</button><a id="openOrbit" href="/" hidden>Open X ORBIT →</a><a id="signInOrbit" href="/">Already have an account? Sign in</a><p id="existingHint" class="muted" hidden>To create another account, first log out in Settings, then reopen this invitation.</p></div>
+   <noscript><p>Enable JavaScript to check your invitation and sign up.</p></noscript>
+  </section>
+  <p class="join-footer">Protected by GuardianLab · Copyright X ORBIT ©</p>
+ </main>
+</body>
+</html>

@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id),native=typeof GuardianGaming!=='undefined';
 const stored=k=>{try{return localStorage.getItem(k)}catch{return null}};
 const account=native?JSON.parse(GuardianGaming.session()):JSON.parse(stored('guardianchat-account')||'null');
-document.documentElement.dataset.theme=stored('guardianchat-theme')||'dark';
+document.documentElement.dataset.theme=native&&typeof GuardianGaming.appearance==='function'?GuardianGaming.appearance():stored('guardianchat-theme')||'dark';
 const node=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const btn=(text,fn,cls='')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b};
 let sum=null,tab='browse',category='',query='',busy=false;
@@ -15,7 +15,7 @@ function adCard(ad,opts={}){const c=node('article','','ad');c.append(node('h3',a
  const row=node('div','','row');if(!opts.hideSeller)row.append(btn('View shop',()=>showShop(ad.uid)));
  if(!ad.mine)row.append(btn('Message seller',()=>message(ad.uid,ad.owner_name||ad.nickname||ad.shop_name)),btn('Report',()=>report(ad)));if(row.children.length)c.append(row);return c}
 async function message(uid,name){try{await api('/contacts',{code:uid});if(native&&GuardianGaming.openChat)GuardianGaming.openChat(uid,name);else location.assign('/?chat='+encodeURIComponent(uid))}catch(e){say(e.message)}}
-async function report(ad){const reason=prompt('Why are you reporting this advert? (optional)')||'';try{await api('/market/report',{id:ad.id,reason});say('Reported. Three reports hide an advert until an administrator reviews it.')}catch(e){say(e.message)}}
+async function report(ad){const reason=prompt('Why are you reporting this advert? (optional)');if(reason===null)return;try{await api('/market/report',{id:ad.id,reason});say('Reported. Three reports hide an advert until an administrator reviews it.')}catch(e){say(e.message)}}
 function shopCard(s){const c=node('article','','shop');c.append(node('h3',s.shop_name));c.append(node('div',(s.nickname?'@'+s.nickname+' · ':'')+s.matches+' matching advert'+(s.matches===1?'':'s'),'by'));if(s.about)c.append(node('p',s.about,'muted'));for(const a of s.ads)c.append(adCard(a,{hideSeller:true}));const r=node('div','','row');r.append(btn('View shop',()=>showShop(s.uid)),btn('Message seller',()=>message(s.uid,s.owner_name||s.nickname||s.shop_name)));c.append(r);return c}
 async function showShop(id){try{const s=await api('/market/account?id='+encodeURIComponent(id));const v=$('view');v.replaceChildren(btn('‹ Back',()=>{tab='browse';render()}),node('h2',s.shop_name),node('p',(s.nickname?'@'+s.nickname:'')+(s.about?' · '+s.about:''),'muted'),...(s.uid===account?.id?[]:[btn('Message seller',()=>message(s.uid,s.owner_name||s.nickname||s.shop_name))]));if(!s.ads.length)v.append(node('p','No live adverts.','muted'));for(const a of s.ads)v.append(adCard(a,{hideSeller:true}))}catch(e){say(e.message)}}
 async function browse(){const v=$('view');v.replaceChildren(node('p','Loading…','muted'));try{const d=await api('/market/ads?q='+encodeURIComponent(query)+'&category='+encodeURIComponent(category));v.replaceChildren();

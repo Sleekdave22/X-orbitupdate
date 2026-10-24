@@ -1,0 +1,23 @@
+/* Camera playback stays separate from the bounded comment overlay. */
+function mountLiveRoomUI({root,video,state,back,profile,like,comments,form,input,send,hostControls=[]}){
+ root.classList.add('live-room');
+ const top=document.createElement('div');top.className='live-top';top.append(back,profile,state);
+ const bottom=document.createElement('div');bottom.className='live-bottom';
+ const toggle=document.createElement('button');toggle.type='button';toggle.className='live-comment-toggle';toggle.textContent='Comments ⌃';toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','liveCommentWindow');
+ comments.id='liveCommentWindow';comments.classList.add('stream-comments','live-comment-window');comments.setAttribute('aria-label','Live comments');
+ function expand(){const expanded=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(expanded));toggle.textContent=expanded?'Comments ⌄':'Comments ⌃';bottom.classList.toggle('comments-expanded',expanded)}
+ toggle.onclick=expand;comments.onclick=e=>{if(!e.target.closest('button,a,input'))expand()};
+ const emoji=document.createElement('button');emoji.type='button';emoji.className='live-emoji-toggle';emoji.textContent='☺';emoji.setAttribute('aria-label','Choose emoji');emoji.setAttribute('aria-expanded','false');
+ const picker=document.createElement('div');picker.className='live-emoji-picker';picker.hidden=true;
+ for(const value of ['😀','😂','😍','👏','🔥','❤️','🎮','🏆','💪','🙌','😮','👍','😢','🎉','⚽','👑']){const b=document.createElement('button');b.type='button';b.textContent=value;b.setAttribute('aria-label',value);b.onclick=()=>{const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;const next=input.value.slice(0,start)+value+input.value.slice(end);if(next.length>input.maxLength)return;input.value=next;input.focus();input.setSelectionRange(start+value.length,start+value.length);input.dispatchEvent(new Event('input',{bubbles:true}));picker.hidden=true;emoji.setAttribute('aria-expanded','false')};picker.append(b)}
+ emoji.onclick=()=>{picker.hidden=!picker.hidden;emoji.setAttribute('aria-expanded',String(!picker.hidden))};
+ like.type='button';form.className='live-comment-composer';form.replaceChildren(emoji,input,send,like);send.setAttribute('aria-label','Send comment');like.setAttribute('aria-label','Like livestream');
+ bottom.append(toggle,comments,picker,form);const reactions=document.createElement('div');reactions.className='live-reactions';reactions.setAttribute('aria-hidden','true');root.replaceChildren(video,reactions,top,bottom);
+ if(hostControls.length){const tools=document.createElement('details');tools.className='live-host-tools';const summary=document.createElement('summary');summary.textContent='Broadcast controls';tools.append(summary,...hostControls);top.append(tools)}
+ const viewport=window.visualViewport;function resize(){root.style.setProperty('--live-height',(viewport?.height||window.innerHeight)+'px');root.style.setProperty('--live-top',(viewport?.offsetTop||0)+'px')};resize();viewport?.addEventListener('resize',resize);viewport?.addEventListener('scroll',resize);
+ const rows=new Map();
+ function renderComments(items){const keep=new Set(items.slice(-100).map(c=>String(c.id)));for(const [id,row] of rows)if(!keep.has(id)){row.remove();rows.delete(id)}for(const c of items.slice(-100)){const id=String(c.id);if(rows.has(id))continue;const row=document.createElement('p'),author=document.createElement('button');author.type='button';author.className='stream-author';author.textContent=c.name;author.onclick=()=>openSocialProfile(c.uid);row.append(author,document.createTextNode(': '+c.text));rows.set(id,row);comments.append(row)}comments.scrollTop=comments.scrollHeight}
+ const reactionIds=new Set();function renderReactions(items){for(const r of items){if(reactionIds.has(r.id))continue;reactionIds.add(r.id);if(reactionIds.size>200)reactionIds.delete(reactionIds.values().next().value);if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)continue;const b=document.createElement('span');b.textContent=r.emoji;b.style.left=(65+Math.random()*22)+'%';reactions.append(b);setTimeout(()=>b.remove(),1800)}}
+ function setActive(on){like.disabled=!on;emoji.disabled=!on;input.disabled=!on;send.disabled=!on;if(!on){renderComments([]);reactions.replaceChildren();picker.hidden=true;emoji.setAttribute('aria-expanded','false')}}
+ return {renderComments,renderReactions,setActive,cleanup(){viewport?.removeEventListener('resize',resize);viewport?.removeEventListener('scroll',resize);root.classList.remove('live-room');root.style.removeProperty('--live-height');root.style.removeProperty('--live-top')}};
+}
