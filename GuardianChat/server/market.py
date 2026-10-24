@@ -32,6 +32,7 @@ def init(server):
           ad TEXT NOT NULL, uid TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL,
           PRIMARY KEY(ad, uid));
         ''')
+    __import__('market_pilot').init(server)
 
 
 def clean(value, low, high, label):
@@ -77,6 +78,8 @@ def search_clause(q):
 
 
 def get(server, uid, path, query):
+    if path in ('/market/catalog','/market/listings','/market/listing','/market/image','/market/store','/market/mine'):
+        return __import__('market_pilot').get(server,uid,path,query)
     now = int(time.time())
     with server.db() as d:
         if path == '/market/summary':
@@ -131,6 +134,8 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
+    if action in ('save_listing','listing_state','report_seller'):
+        return __import__('market_pilot').post(server,uid,action,b)
     now = int(time.time())
     with server.db() as d:
         d.execute('BEGIN IMMEDIATE')
@@ -152,6 +157,7 @@ def post(server, uid, action, b):
             if not ad:
                 raise ValueError('Advert not found')
             d.execute('UPDATE market_ads SET status=? WHERE id=?', ('active' if action == 'admin_restore' else 'removed', ad['id']))
+            d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',('ACTIVE' if action=='admin_restore' else 'REMOVED',now,ad['id']))
             __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert was '+('restored' if action=='admin_restore' else 'removed after review')+'.',{'ad':ad['id']})
             if action == 'admin_restore':
                 d.execute('DELETE FROM market_reports WHERE ad=?', (ad['id'],))
@@ -165,6 +171,7 @@ def post(server, uid, action, b):
             d.execute('INSERT OR IGNORE INTO market_reports VALUES(?,?,?,?)', (ad['id'], uid, clean(b.get('reason'), 0, 200, 'Reason'), now))
             if d.execute('SELECT COUNT(*) FROM market_reports WHERE ad=?', (ad['id'],)).fetchone()[0] >= HOLD_AFTER_REPORTS:
                 d.execute("UPDATE market_ads SET status='held' WHERE id=?", (ad['id'],))
+                d.execute("UPDATE market_listing_meta SET state='PENDING_REVIEW',revision=revision+1,updated=? WHERE id=?",(now,ad['id']))
                 __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert is held for review.',{'ad':ad['id']})
             return {'ok': True}
         if not mine:
@@ -198,6 +205,7 @@ def post(server, uid, action, b):
                 raise ValueError('Advert not found')
             if action == 'remove_ad':
                 d.execute("UPDATE market_ads SET status='removed' WHERE id=?", (ad['id'],))
+                d.execute("UPDATE market_listing_meta SET state='REMOVED',revision=revision+1,updated=? WHERE id=?",(now,ad['id']))
             else:
                 if ad['status'] == 'held':
                     raise ValueError('This advert is waiting for an administrator')
