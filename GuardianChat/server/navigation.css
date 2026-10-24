@@ -8,6 +8,12 @@ body:has(.orbit-bottom-nav:not([hidden])) main{padding-bottom:86px!important}
 .profile-management{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #marketTab img{width:26px;height:26px;object-fit:contain}
 .notification-badge{position:absolute;right:1px;top:1px;background:#ed4b71;color:#fff;border-radius:20px;min-width:16px;height:16px;font:600 10px/16px system-ui;text-align:center;padding:0 3px;pointer-events:none}
+.arena-account-row :is(#gamingTab,#marketTab){display:inline-flex!important;position:relative;align-items:center;justify-content:center;gap:8px!important;min-height:44px!important;margin:0!important;padding:8px 14px!important;font-size:13px!important;background:var(--violet,#7c3aed)!important;color:#fff!important;border:0!important;border-radius:16px!important;box-shadow:none!important;overflow:hidden;isolation:isolate}
+.arena-account-row :is(#gamingTab,#marketTab) img{width:26px;height:26px;flex:none;object-fit:contain;border-radius:6px}
+.arena-account-row .notification-badge{right:4px;top:3px;min-width:14px;height:14px;font-size:9px;line-height:14px;padding:0 2px;z-index:1;box-sizing:border-box}
+.market-back{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--cyan-text)!important}
+.listing-open{min-height:76px;display:flex!important;flex-direction:column;justify-content:space-between;gap:12px}
+.listing-handle{display:block;align-self:flex-end;text-align:right;font-size:11px;font-weight:400;color:var(--muted);font-style:italic;max-width:100%;overflow-wrap:anywhere}
 .orbit-notification-item{font-size:12px;line-height:1.45;padding:10px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line,#303651)}
 .orbit-notification-item p{font-size:12px;margin:4px 0}
 .orbit-notification-item small{font-size:10px}

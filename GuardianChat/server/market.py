@@ -134,7 +134,7 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
-    if action in ('save_listing','listing_state','report_seller'):
+    if action in ('save_listing','listing_state','report_seller','search_preferences'):
         return __import__('market_pilot').post(server,uid,action,b)
     now = int(time.time())
     with server.db() as d:

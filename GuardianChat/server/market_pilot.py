@@ -37,6 +37,7 @@ def init(server):
   ''')
   for ident,icon,name,subs,attrs in CATEGORIES:
    d.execute('INSERT OR IGNORE INTO market_categories(id,name,icon,subcategories,attributes) VALUES(?,?,?,?,?)',(ident,name,icon,json.dumps(subs),json.dumps(attrs)))
+ __import__('market_search').init(server)
 
 def catalog(d,all=False):
  return [dict(r)|{'subcategories':json.loads(r['subcategories']),'attributes':json.loads(r['attributes'])} for r in d.execute('SELECT * FROM market_categories'+('' if all else ' WHERE enabled=1')+' ORDER BY rowid')]
@@ -107,7 +108,7 @@ def notify(d,uid,event,listing,message):
 def get(server,uid,path,q):
  arg=lambda n,default='':q.get(n,[default])[0]
  with server.db() as d:
-  if path=='/market/catalog':return {'categories':catalog(d),'currencies':sorted(CURRENCIES),'conditions':sorted(CONDITIONS),'max_images':6}
+  if path=='/market/catalog':return {'categories':catalog(d),'currencies':sorted(CURRENCIES),'conditions':sorted(CONDITIONS),'max_images':6,'discovery':dict(d.execute('SELECT * FROM market_discovery WHERE uid=?',(uid,)).fetchone() or {})}
   if path=='/market/listing':return {'listing':accessible(d,uid,arg('id'))}
   if path=='/market/image':
    image=d.execute('SELECT * FROM market_images WHERE id=?',(arg('id'),)).fetchone()
@@ -119,10 +120,7 @@ def get(server,uid,path,q):
    params=[uid] if path.endswith('/mine') else [int(time.time())]
    rows=d.execute(BASE+where+' ORDER BY a.created DESC,a.id DESC',params).fetchall()
    items=[view(d,r,uid) for r in rows]
-   if arg('category'):items=[v for v in items if v['category_id']==arg('category')]
-   if arg('q'):
-    terms=re.findall(r'\w+',arg('q').lower())[:12]
-    items=[v for v in items if all(t in (v['title']+' '+v['description']+' '+json.dumps(v['attributes'])).lower() for t in terms)]
+   if path=='/market/listings':return __import__('market_search').search(d,uid,items,q)
    offset=max(0,min(100000,int(arg('offset','0'))));return {'listings':items[offset:offset+20],'more':len(items)>offset+20,'total':len(items)}
   if path=='/market/store':
    target=arg('id');r=d.execute('SELECT m.shop_name,m.about,u.id,u.name,u.nickname,u.avatar,u.avatar_mime FROM market_accounts m JOIN users u ON u.id=m.uid WHERE m.uid=?',(target,)).fetchone()
@@ -136,6 +134,7 @@ def get(server,uid,path,q):
  raise ValueError('Unknown Market pilot route')
 
 def post(server,uid,action,b):
+ if action=='search_preferences':return __import__('market_search').save_preferences(server,uid,b)
  now=int(time.time())
  if action=='save_listing':
   # Decode images before acquiring the write lock; never store undecoded source bytes.
