@@ -46,6 +46,7 @@ async function sponsoredView(view){
   host.append(node('p','Registration closes '+new Date(l.registration_closes*1000).toLocaleString()),node('p','Play '+new Date(l.starts*1000).toLocaleString()+' — '+new Date(l.ends*1000).toLocaleString()),node('p','Win 3 · draw 1 · loss 0. Each opponent counts once per league. League matches never change your global rating. No daily match cap.','muted'),node('p','Disputes award no points. Unresolved cases are voided 48 hours after their evidence deadline; an independent administrator can review an appeal.','muted'));
   const status=node('p');status.setAttribute('role','status');host.append(status);
   const action=(label,name)=>host.append(phaseBButton(label,status,async()=>{const r=await api('/leagues/'+name,{league:l.id});if(r.message)status.textContent=r.message;signature='';await refresh()}));
+  if(info.joined)host.append(node('p','✓ Registered','registration-state'),button('Edit availability',()=>editPlayingAvailability(l.game)));
   if(!info.joined&&l.state==='REGISTRATION_OPEN')action('Register for this league','register');
   if(info.joined&&l.state==='ACTIVE'&&!info.matches.some(m=>!['verified','cancelled'].includes(m.state)))action(info.queue?'Cancel search':'Find league opponent',info.queue?'queue_leave':'queue');
   if(info.queue)host.append(node('p','Searching the compatible league pool… Keep this page open. Declines continue the search automatically.','muted'));

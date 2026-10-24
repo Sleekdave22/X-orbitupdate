@@ -10,9 +10,9 @@ async function privateResultRoom(id){
  const returnToMatches=async()=>{resultCleanup?.();tab=initial.kind==='open'?'open':'fixtures';await load()};
  view.append(button('‹ Matches',returnToMatches),node('h2',initial.names[initial.a]+' vs '+initial.names[initial.b]),state,
   node('p','Registered game IDs: '+(initial.game_ids?.[initial.a]||'Unavailable')+' / '+(initial.game_ids?.[initial.b]||'Unavailable'),'muted'),
-  node('p','Do not close the game result screen until confirmation. Keep both gaming IDs and scores visible in case camera photo or video proof is needed.','card'),area);
- const messages=node('form');messages.dataset.formInline='1';
- const draft=input(messages,'Message to your opponent','text'),send=node('button','➤');send.type='submit';messages.append(send);view.append(comments,messages);
+  node('p','Keep your game result screen open until confirmation. Both gaming IDs and scores must remain visible.','muted'));
+ const messages=node('form');messages.dataset.formInline='1';messages.className='result-chat-composer';
+ const draft=input(messages,'Message to your opponent','text'),send=node('button','➤');draft.placeholder='Message your opponent…';send.type='submit';send.setAttribute('aria-label','Send result chat message');messages.append(send);view.classList.add('private-result-chat');view.append(comments,area,messages);
  messages.onsubmit=async e=>{e.preventDefault();if(!draft.value.trim()||closed)return;send.disabled=true;try{await api('/gamebox/result_comment',{room:id,text:draft.value.trim()});draft.value='';await poll()}catch(e){state.textContent=e.message}finally{send.disabled=false}};
  function render(r){
   const review=r.evidence_review||{state:'not_submitted',submitted:false,received:0};
@@ -58,9 +58,9 @@ async function privateResultRoom(id){
   }
   if(!(disputed||r.can_report)){area.append(node('p','Complete both check-ins before submitting a result.'));return;}
   area.append(node('p','Use your phone camera to capture the PC/TV. Photo and video evidence goes privately to the review backend.','muted'));
-  const form=node('form'),detail=node('p',uploadError,'muted'),submit=node('button','Submit privately for review');submit.type='submit';submit.disabled=true;
+  const form=node('form'),detail=node('p',uploadError,'muted'),submit=node('button','Submit privately for review');submit.type='submit';submit.disabled=true;submit.hidden=true;
   form.dataset.formInline='1';
-  captureWidget=OrbitEvidenceCamera.mount({container:form,videoRequired:review.stage==='video',onCapture:blob=>{selected=blob;uploadError='';submit.disabled=false;detail.textContent='Camera capture ready for private submission.'}});
+  captureWidget=OrbitEvidenceCamera.mount({container:form,videoRequired:review.stage==='video',onCapture:blob=>{selected=blob;uploadError='';submit.disabled=!blob;submit.hidden=!blob;detail.textContent=blob?'Camera capture ready for private submission.':''}});
   form.append(detail,submit);
   form.onsubmit=async e=>{e.preventDefault();if(!selected||uploading||closed)return;uploading=true;submit.disabled=true;detail.textContent='Uploading privately…';
    try{const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Could not read this file'));reader.readAsDataURL(selected)});
@@ -76,7 +76,7 @@ async function privateResultRoom(id){
   const stamp=JSON.stringify(r.comments);if(stamp!==commentSignature){commentSignature=stamp;comments.replaceChildren(...r.comments.map(c=>node('p',c.name+': '+c.text)));comments.scrollTop=comments.scrollHeight}
  }catch(e){if(!closed)state.textContent=e.message}finally{busy=false}}
  const timer=setInterval(poll,2000),leaving=()=>resultCleanup?.();
- resultCleanup=()=>{closed=true;clearInterval(timer);selected=null;captureWidget?.destroy();captureWidget=null;window.removeEventListener('pagehide',leaving);resultCleanup=null};
+ resultCleanup=()=>{closed=true;view.classList.remove('private-result-chat');clearInterval(timer);selected=null;captureWidget?.destroy();captureWidget=null;window.removeEventListener('pagehide',leaving);resultCleanup=null};
  window.addEventListener('pagehide',leaving);render(initial);await poll();
 }
 resultRoom=privateResultRoom;

@@ -148,10 +148,11 @@ def post(server, uid, action, b):
         if action == 'admin_restore' or action == 'admin_remove':
             if not is_admin(d, uid):
                 raise ValueError('Only the administrator may do that')
-            ad = d.execute('SELECT id FROM market_ads WHERE id=?', (b.get('id'),)).fetchone()
+            ad = d.execute('SELECT id,uid FROM market_ads WHERE id=?', (b.get('id'),)).fetchone()
             if not ad:
                 raise ValueError('Advert not found')
             d.execute('UPDATE market_ads SET status=? WHERE id=?', ('active' if action == 'admin_restore' else 'removed', ad['id']))
+            __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert was '+('restored' if action=='admin_restore' else 'removed after review')+'.',{'ad':ad['id']})
             if action == 'admin_restore':
                 d.execute('DELETE FROM market_reports WHERE ad=?', (ad['id'],))
             return {'ok': True}
@@ -164,6 +165,7 @@ def post(server, uid, action, b):
             d.execute('INSERT OR IGNORE INTO market_reports VALUES(?,?,?,?)', (ad['id'], uid, clean(b.get('reason'), 0, 200, 'Reason'), now))
             if d.execute('SELECT COUNT(*) FROM market_reports WHERE ad=?', (ad['id'],)).fetchone()[0] >= HOLD_AFTER_REPORTS:
                 d.execute("UPDATE market_ads SET status='held' WHERE id=?", (ad['id'],))
+                __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert is held for review.',{'ad':ad['id']})
             return {'ok': True}
         if not mine:
             raise ValueError('Open your shop first')

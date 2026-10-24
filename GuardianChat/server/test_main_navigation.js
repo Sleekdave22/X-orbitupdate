@@ -5,6 +5,8 @@ assert.deepEqual(tabs.map(x=>x[1]),['vibeTab','chatsTab','callsTab','profileTab'
 assert(!tabs[0][0].includes('<span>'));assert(tabs[0][0].includes('aria-label="Vibe"'));
 for(const [i,icon] of ['vibe','chat','call','profile'].entries())assert(tabs[i][0].includes(`/navigation-icons/${icon}-icon.svg`));
 assert(html.includes('id="gamingTab"'));assert(html.includes('id="marketTab"'));assert(!nav.includes('marketTab'));
+assert(html.includes('<script src="/orbit-navigation.js?v=27"></script>'),'The shared navigation handlers must be loaded');
+assert(html.includes('href="/navigation.css?v=27"'),'The fixed-bottom navigation stylesheet must be loaded');
 for(const name of ['vibe-icon.svg','chat-icon.svg','call-icon.svg','profile-icon.svg','orbit-market-icon.svg'])assert.equal(fs.readFileSync(path.join(__dirname,'navigation-icons',name),'utf8'),fs.readFileSync(path.join(__dirname,'../chat/src/main/assets/navigation-icons',name),'utf8'));
 const native=fs.readFileSync(__dirname+'/../chat/src/main/java/com/guardianlab/chat/MainActivity.kt','utf8');assert(native.includes('if(ownProfile)root.addView(homeTabs("profile"))'));assert(native.includes('if(page=="/vibe.html")root.addView(homeTabs("vibe"))'));
 console.log('Four ordered tabs, supplied SVG parity, icon-only accessible Vibe, retained upper Play/Market and native Profile/Vibe navigation passed.');

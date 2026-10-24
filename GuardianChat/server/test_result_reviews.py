@@ -59,6 +59,10 @@ class ReviewTest(unittest.TestCase):
         final=self.state(users[0],m)
         self.assertEqual(final['state'],'verified');self.assertEqual(final['final_score'],[3,1])
         self.assertEqual(final['evidence_review']['state'],'finalized')
+        notifications=self.call('/notifications?category=play',token=users[0]['token'])['notifications']
+        decision=[n for n in notifications if n['text'].startswith('Match dispute resolved:')]
+        self.assertEqual(len(decision),1)
+        self.assertEqual(decision[0]['target'],{'match':m['id'],'kind':'open','result':True})
         self.assertFalse(result_reviews.process_one(self.server,now+100,reader=lambda _:reading(m)))
         with self.server.db() as d:
             self.assertEqual(d.execute('SELECT COUNT(*) FROM gb_rank_awards').fetchone()[0],1)

@@ -4,19 +4,20 @@ window.OrbitEvidenceCamera={mount({container,videoRequired=false,onCapture,onAct
  const root=el('section'),preview=el('video'),photoPreview=el('img'),notice=el('p','Keep the PC/TV result screen open. Both gaming IDs, match details and final scores must be visible.');
  root.className='evidence-camera';preview.hidden=true;preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Your private camera preview');preview.style.cssText='width:100%;max-height:38vh;object-fit:contain;border-radius:14px;background:#080b18';
  photoPreview.hidden=true;photoPreview.alt='Your unsent camera photo';photoPreview.style.cssText=preview.style.cssText;
- const modes=el('div'),photo=el('button','Photo'),video=el('button','Video'),open=el('button','Open camera'),flip=el('button','Switch camera'),shutter=el('button','●'),stop=el('button','Stop recording'),hint=el('p','Tap for a photo. Hold for video. Slide upward to lock recording. Record 12–60 seconds, up to 20 MB.'),feedback=el('p');
- for(const b of [photo,video,open,flip,shutter,stop])b.type='button';
- photo.disabled=videoRequired;stop.hidden=true;shutter.disabled=true;
+ const modes=el('div'),panel=el('section'),back=el('button','‹ Back to conversation'),open=el('button'),flip=el('button','↻'),shutter=el('button','●'),stop=el('button','Stop recording'),hint=el('p',videoRequired?'Video proof needed: tap to start, or hold and swipe up to lock.':'Tap the shutter for a photo. Hold for video; swipe up to lock.'),feedback=el('p');
+ for(const b of [back,open,flip,shutter,stop])b.type='button';panel.hidden=true;
+ open.setAttribute('aria-label','Capture result evidence with camera');open.title='Capture photo or video evidence';open.className='evidence-camera-launcher';open.innerHTML='<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="4"/></svg>';
+ flip.setAttribute('aria-label','Switch camera');stop.hidden=true;shutter.disabled=true;
  shutter.setAttribute('aria-label','Camera shutter: tap photo, hold video, swipe up to lock');shutter.style.cssText='width:64px;height:64px;min-width:64px;border-radius:50%;font-size:30px;touch-action:none;user-select:none';
- modes.className='actions';modes.append(photo,video,open,flip);root.append(notice,modes,preview,photoPreview,shutter,stop,hint,feedback);container.append(root);
+ modes.className='actions';modes.append(back,flip);panel.className='evidence-camera-panel';panel.append(modes,notice,preview,photoPreview,shutter,stop,hint,feedback);root.append(open,panel);container.append(root);
  let stream=null,recorder=null,parts=[],mode=videoRequired?'video':'photo',recording=false,finalizing=false,locked=false,destroyed=false,pressTimer=null,limitTimer=null,startY=0,url='',held=false,bytes=0,suppressClick=false,facing='environment',started=0,cameraGeneration=0;
  const active=()=>Boolean(stream||recording||finalizing);
  const announce=()=>onActive?.(active());
  function revoke(){if(url)URL.revokeObjectURL(url);url=''}
  function tracks(){stream?.getTracks().forEach(t=>t.stop());stream=null;preview.srcObject=null;announce()}
- function captured(blob){if(destroyed)return;if(blob.size>20*1024*1024){feedback.textContent='Recording exceeded 20 MB. Make a shorter recording.';tracks();return}revoke();url=URL.createObjectURL(blob);preview.srcObject=null;const motion=blob.type.startsWith('video/');preview.hidden=!motion;photoPreview.hidden=motion;if(motion)preview.src=url;else photoPreview.src=url;preview.controls=motion;preview.loop=false;onCapture(blob);feedback.textContent='Captured privately. Check it, then submit for review.';shutter.disabled=true;open.textContent='Retake with camera';tracks()}
+ function captured(blob){if(destroyed||panel.hidden)return;if(blob.size>20*1024*1024){feedback.textContent='Recording exceeded 20 MB. Make a shorter recording.';tracks();return}revoke();url=URL.createObjectURL(blob);preview.srcObject=null;const motion=blob.type.startsWith('video/');preview.hidden=!motion;photoPreview.hidden=motion;if(motion)preview.src=url;else photoPreview.src=url;preview.controls=motion;preview.loop=false;onCapture(blob);feedback.textContent='Captured privately. Check it, then submit for review. Use the camera icon to retake.';shutter.disabled=true;tracks()}
  async function startCamera(){
-  if(recording||finalizing||destroyed)return;const generation=++cameraGeneration;tracks();revoke();preview.removeAttribute('src');photoPreview.removeAttribute('src');photoPreview.hidden=true;preview.hidden=false;preview.controls=false;
+  if(recording||finalizing||destroyed)return;panel.hidden=false;onCapture(null);const generation=++cameraGeneration;tracks();revoke();preview.removeAttribute('src');photoPreview.removeAttribute('src');photoPreview.hidden=true;preview.hidden=false;preview.controls=false;
   try{if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera capture is unavailable in this browser');
    const media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1280,max:1920},height:{ideal:720,max:1080}},audio:false});
    if(destroyed||generation!==cameraGeneration){media.getTracks().forEach(t=>t.stop());return}stream=media;preview.srcObject=stream;await preview.play();shutter.disabled=false;feedback.textContent='Camera ready. Frame both gaming IDs and the final score.';announce();
@@ -43,8 +44,7 @@ window.OrbitEvidenceCamera={mount({container,videoRequired=false,onCapture,onAct
   if(!canvas.width||!canvas.height){feedback.textContent='Wait for the camera preview';return}
   canvas.getContext('2d').drawImage(preview,0,0);canvas.toBlob(blob=>{canvas.width=canvas.height=1;if(blob)captured(blob);else feedback.textContent='Could not capture this photo'},'image/jpeg',.9);
  }
- const modeState=()=>{photo.setAttribute('aria-pressed',String(mode==='photo'));video.setAttribute('aria-pressed',String(mode==='video'))};modeState();
- photo.onclick=()=>{if(recording||finalizing||videoRequired)return;mode='photo';modeState();feedback.textContent='Photo: tap the shutter. Hold it to record video.'};video.onclick=()=>{if(recording||finalizing)return;mode='video';modeState();feedback.textContent='Video: tap to start/stop, or hold and swipe upward to lock.'};
+ back.onclick=()=>{panel.hidden=true;cameraGeneration++;clearTimeout(pressTimer);clearTimeout(limitTimer);if(recording)stopRecording();tracks();revoke();preview.hidden=photoPreview.hidden=true;shutter.disabled=true;onCapture(null);feedback.textContent=''};
  open.onclick=startCamera;flip.onclick=async()=>{if(recording)return;facing=facing==='environment'?'user':'environment';await startCamera()};stop.onclick=stopRecording;
  shutter.onpointerdown=e=>{if(!stream||destroyed)return;e.preventDefault();startY=e.clientY;held=false;suppressClick=true;shutter.setPointerCapture?.(e.pointerId);
   if(recording&&locked){stopRecording();return}

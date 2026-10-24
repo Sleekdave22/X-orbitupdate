@@ -1,5 +1,5 @@
 /* Existing dialogs/components; authoritative time conversion and decisions stay on the server. */
-window.OrbitSchedule={url:n=>n.match_id&&['fixture','open'].includes(n.kind)?'/gaming.html?'+new URLSearchParams({match:n.match_id,match_kind:n.kind}):'/gaming.html?invites=1'};
+window.OrbitSchedule={url:n=>n.match_id&&['fixture','open'].includes(n.kind)?'/gaming.html?'+new URLSearchParams({match:n.match_id,match_kind:n.kind,...(n.result?{result:'1'}:{})}):'/gaming.html?invites=1'};
 function scheduleTime(at,tz){return at?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short',timeZone:tz}).format(new Date(at*1000))+' · '+tz:'Not agreed yet'}
 function scheduleLocal(at,tz){const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(at*1000)).map(p=>[p.type,p.value]));return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`}
 /* Local wall-clock picker: Set commits a draft; Save/Send remains a separate action. */

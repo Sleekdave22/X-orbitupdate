@@ -55,7 +55,7 @@ def authorised(d,uid):
  if not gaming.admin(d,uid):raise PermissionError('Administration is restricted to the authorised account')
 def event(d,mid,uid,action,old=None,new=None,reason=''):
  d.execute('INSERT INTO gb_events(match,actor,action,old,new,reason,created) VALUES(?,?,?,?,?,?,?)',(mid,uid,action,json.dumps(old),json.dumps(new),reason,int(time.time())))
-def notice(d,uid,text):d.execute('INSERT INTO gb_notices(uid,text,created) VALUES(?,?,?)',(uid,text,int(time.time())))
+def notice(d,uid,text):return d.execute('INSERT INTO gb_notices(uid,text,created) VALUES(?,?,?)',(uid,text,int(time.time()))).lastrowid
 def validate(c):
  if type(c)!=dict or set(c)!=set(DEFAULT):raise ValueError('Only supported Studio controls may be changed')
  for k,(lo,hi) in LIMITS.items():

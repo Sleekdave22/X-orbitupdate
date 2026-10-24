@@ -177,7 +177,7 @@ def valid_notice(d,n,now=None):
  if l['purpose']=='request':return bool(d.execute("SELECT 1 FROM gb_schedule_requests WHERE id=? AND kind=? AND match_id=? AND state='pending' AND expires>?",(l['request_id'],l['kind'],l['match_id'],now)).fetchone())
  return True
 def public_notice(d,n):
- l=row(d,'SELECT kind,match_id,version,expires FROM gb_notice_links WHERE notice=?',(n['id'],));return dict(n,**l) if l else dict(n)
+ l=row(d,'SELECT kind,match_id,version,expires FROM gb_notice_links WHERE notice=?',(n['id'],));r=row(d,'SELECT target FROM gb_activity_targets WHERE notice=?',(n['id'],));extra=json.loads(r['target']) if r else {};return dict(n,**(dict(l) if l else {}),**({'match_id':extra['match'],'kind':extra['kind'],'result':True} if extra else {}))
 def visible_notices(d,uid):return [public_notice(d,n) for n in d.execute('SELECT * FROM gb_notices WHERE uid=? AND seen=0 ORDER BY id DESC LIMIT 100',(uid,)) if valid_notice(d,n)][:30]
 def tick(server,now=None):
  now=int(time.time()) if now is None else now

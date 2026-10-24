@@ -87,7 +87,9 @@ def register(d,m,uid,digest,now,legacy=False,stage='photo'):
 
 def notify(d,m,text):
     import gamebox_core
-    for uid in (m['a'],m['b']):gamebox_core.notice(d,uid,text)
+    for uid in (m['a'],m['b']):
+        ident=gamebox_core.notice(d,uid,text)
+        __import__('account_notifications').link_play(d,ident,'open',m['id'],m['kind'])
 
 def status(d,m,uid):
     job=row(d,'SELECT * FROM result_review_jobs WHERE kind=? AND match_id=?',(m['kind'],m['id']))
@@ -191,8 +193,10 @@ def require_both(d,m):
     if not count or count<2 and (not job['deadline'] or time.time()<job['deadline']):raise ValueError('Wait for the other player or the 15-minute response deadline, then validate the evidence before deciding')
 
 def finalized(d,kind,rid,a,b,actor,reason):
+    previous=row(d,'SELECT state FROM result_review_jobs WHERE kind=? AND match_id=?',(kind,rid))
     d.execute("UPDATE result_review_jobs SET state='finalized',decision=?,reason=?,finished=?,lease=NULL,lease_until=NULL WHERE kind=? AND match_id=?",(json.dumps({'score':[a,b],'actor':actor}),reason[:500],int(time.time()),kind,rid))
     m=match(d,rid)
+    if previous and previous['state']!='finalized':notify(d,m,'Match dispute resolved: '+str(a)+' – '+str(b)+'. Open the final result.')
     rules=json.loads(m['rules']) if kind=='open' else json.loads(row(d,'SELECT policy_snapshot FROM leagues WHERE id=?',(m['league'],))['policy_snapshot'] or __import__('gamebox_core').current(d)['config'])
     d.execute('UPDATE result_review_videos SET expires=? WHERE kind=? AND match_id=?',(int(time.time())+rules['retention_seconds'],kind,rid))
 
