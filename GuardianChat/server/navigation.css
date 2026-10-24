@@ -1,0 +1,12 @@
+.orbit-bottom-nav{display:flex!important;position:sticky;bottom:0;z-index:30;gap:4px;padding:6px!important;background:var(--card,#131932)!important;border-radius:16px;margin-top:auto}
+.orbit-bottom-nav[hidden]{display:none!important}
+.orbit-bottom-nav button{flex:1;min-width:0;min-height:54px!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px!important;font-size:11px!important;border:0!important;background:var(--card2,#202546)!important;color:var(--ink,#f4f5fa)!important}
+.orbit-bottom-nav button[aria-selected=true]{background:var(--violet,#7c3aed)!important}
+.orbit-bottom-nav img{width:26px;height:26px;object-fit:contain;flex:none}
+.orbit-bottom-nav button[aria-selected=false] img{opacity:.7}
+.profile-management{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#marketTab img{width:26px;height:26px;object-fit:contain}
+.notification-badge{position:absolute;right:1px;top:1px;background:#ed4b71;color:#fff;border-radius:20px;min-width:16px;height:16px;font:600 10px/16px system-ui;text-align:center;padding:0 3px;pointer-events:none}
+.orbit-notification-item{font-size:12px;line-height:1.45;padding:10px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line,#303651)}
+.orbit-notification-item p{font-size:12px;margin:4px 0}
+.orbit-notification-item small{font-size:10px}

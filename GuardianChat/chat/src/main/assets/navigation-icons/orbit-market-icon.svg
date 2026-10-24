@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Orbit Market icon">
+<defs><linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#2563EB"/></linearGradient>
+<radialGradient id="glow" cx="0.3" cy="0.2" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<clipPath id="lower"><rect x="0" y="268" width="512" height="200"/></clipPath></defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/><rect width="512" height="512" rx="112" fill="url(#glow)"/>
+<g transform="rotate(-18 256 268)"><ellipse cx="256" cy="268" rx="206" ry="66" fill="none" stroke="#22D3EE" stroke-width="12" opacity="0.9"/></g>
+<path d="M140 226h232v156a14 14 0 0 1-14 14H154a14 14 0 0 1-14-14z" fill="#FFFFFF"/>
+<rect x="216" y="286" width="80" height="110" rx="10" fill="#4F46E5"/><circle cx="282" cy="344" r="6" fill="#FFFFFF"/>
+<rect x="156" y="262" width="44" height="44" rx="8" fill="#C7D2FE"/><rect x="312" y="262" width="44" height="44" rx="8" fill="#C7D2FE"/>
+<path d="M116.0 150L162.7 150L146.7 224L92.0 224Z" fill="#FFFFFF"/><path d="M162.7 150L209.3 150L201.3 224L146.7 224Z" fill="#C7D2FE"/><path d="M209.3 150L256.0 150L256.0 224L201.3 224Z" fill="#FFFFFF"/><path d="M256.0 150L302.7 150L310.7 224L256.0 224Z" fill="#C7D2FE"/><path d="M302.7 150L349.3 150L365.3 224L310.7 224Z" fill="#FFFFFF"/><path d="M349.3 150L396.0 150L420.0 224L365.3 224Z" fill="#C7D2FE"/><path d="M92.0 224A27.3 27.3 0 0 0 146.7 224Z" fill="#FFFFFF"/><path d="M146.7 224A27.3 27.3 0 0 0 201.3 224Z" fill="#C7D2FE"/><path d="M201.3 224A27.3 27.3 0 0 0 256.0 224Z" fill="#FFFFFF"/><path d="M256.0 224A27.3 27.3 0 0 0 310.7 224Z" fill="#C7D2FE"/><path d="M310.7 224A27.3 27.3 0 0 0 365.3 224Z" fill="#FFFFFF"/><path d="M365.3 224A27.3 27.3 0 0 0 420.0 224Z" fill="#C7D2FE"/>
+<g transform="rotate(-18 256 268)"><g clip-path="url(#lower)"><ellipse cx="256" cy="268" rx="206" ry="66" fill="none" stroke="#22D3EE" stroke-width="12"/></g></g>
+<circle cx="452" cy="196" r="18" fill="#FFFFFF"/><circle cx="452" cy="196" r="9" fill="#22D3EE"/>
+</svg>

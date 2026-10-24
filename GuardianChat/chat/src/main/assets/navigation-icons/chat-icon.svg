@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Chat icon">
+<defs>
+<linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#2563EB"/></linearGradient>
+<radialGradient id="glow" cx="0.3" cy="0.2" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<linearGradient id="fig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D7DEFF"/></linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/><rect width="512" height="512" rx="112" fill="url(#glow)"/>
+<!-- reply bubble (back, cyan) -->
+<path d="M268 236h130a46 46 0 0 1 46 46v78a46 46 0 0 1-46 46h-4v54l-70-54h-56a46 46 0 0 1-46-46v-78a46 46 0 0 1 46-46z" fill="#22D3EE"/>
+<!-- main bubble (front, white) -->
+<path d="M150 108h172a52 52 0 0 1 52 52v100a52 52 0 0 1-52 52H214l-80 62v-62a52 52 0 0 1-36-50V160a52 52 0 0 1 52-52z" fill="url(#fig)"/>
+<!-- typing dots -->
+<circle cx="190" cy="210" r="19" fill="#6D28D9"/><circle cx="244" cy="210" r="19" fill="#6D28D9" opacity="0.75"/><circle cx="298" cy="210" r="19" fill="#6D28D9" opacity="0.5"/>
+</svg>

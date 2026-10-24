@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Call icon">
+<defs>
+<linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#2563EB"/></linearGradient>
+<radialGradient id="glow" cx="0.3" cy="0.2" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<linearGradient id="fig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D7DEFF"/></linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/><rect width="512" height="512" rx="112" fill="url(#glow)"/>
+<!-- handset -->
+<g transform="rotate(-8 256 280)">
+<path d="M150 190 C 128 300 206 392 326 370" fill="none" stroke="url(#fig)" stroke-width="76" stroke-linecap="round"/>
+<rect x="108" y="140" width="96" height="104" rx="30" transform="rotate(-16 156 192)" fill="url(#fig)"/>
+<rect x="282" y="322" width="104" height="96" rx="30" transform="rotate(-16 334 370)" fill="url(#fig)"/>
+</g>
+<!-- sound rings spreading out -->
+<path d="M312 130a118 118 0 0 1 70 70" fill="none" stroke="#22D3EE" stroke-width="16" stroke-linecap="round"/>
+<path d="M322 84a180 180 0 0 1 106 106" fill="none" stroke="#22D3EE" stroke-width="16" stroke-linecap="round" opacity="0.7"/>
+<path d="M334 40a240 240 0 0 1 138 138" fill="none" stroke="#22D3EE" stroke-width="16" stroke-linecap="round" opacity="0.4"/>
+</svg>
