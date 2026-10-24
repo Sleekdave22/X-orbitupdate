@@ -59,7 +59,7 @@ def ad_view(r, me):
 
 BASE = '''SELECT a.*, m.shop_name, u.nickname, u.name AS owner_name FROM market_ads a
           JOIN market_accounts m ON m.uid=a.uid JOIN users u ON u.id=a.uid '''
-LIVE = "a.status='active' AND a.expires>?"
+LIVE = "a.status='active' AND a.expires>? AND NOT EXISTS(SELECT 1 FROM market_seller_meta s WHERE s.uid=a.uid AND s.restricted=1)"
 
 
 def like(term):
@@ -78,6 +78,8 @@ def search_clause(q):
 
 
 def get(server, uid, path, query):
+    if path in ('/market/saved','/market/offers','/market/offer','/market/chat_context','/market/activity'):
+        return __import__('market_connections').get(server,uid,path,query)
     if path in ('/market/catalog','/market/listings','/market/listing','/market/image','/market/store','/market/mine'):
         return __import__('market_pilot').get(server,uid,path,query)
     now = int(time.time())
@@ -134,6 +136,8 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
+    if action in ('save_item','offer_create','offer_action','inquiry','activity_seen'):
+        return __import__('market_connections').post(server,uid,action,b)
     if action in ('save_listing','listing_state','report_seller','search_preferences'):
         return __import__('market_pilot').post(server,uid,action,b)
     now = int(time.time())
@@ -156,6 +160,7 @@ def post(server, uid, action, b):
             ad = d.execute('SELECT id,uid FROM market_ads WHERE id=?', (b.get('id'),)).fetchone()
             if not ad:
                 raise ValueError('Advert not found')
+            if d.execute('SELECT 1 FROM market_reservations WHERE listing=?',(ad['id'],)).fetchone():raise ValueError('Resolve the active reservation or demo order before removing this listing')
             d.execute('UPDATE market_ads SET status=? WHERE id=?', ('active' if action == 'admin_restore' else 'removed', ad['id']))
             d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',('ACTIVE' if action=='admin_restore' else 'REMOVED',now,ad['id']))
             __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert was '+('restored' if action=='admin_restore' else 'removed after review')+'.',{'ad':ad['id']})
@@ -203,6 +208,7 @@ def post(server, uid, action, b):
             ad = d.execute('SELECT * FROM market_ads WHERE id=? AND uid=?', (b.get('id'), uid)).fetchone()
             if not ad or ad['status'] == 'removed':
                 raise ValueError('Advert not found')
+            if d.execute('SELECT 1 FROM market_reservations WHERE listing=?',(ad['id'],)).fetchone():raise ValueError('This listing has an active reservation')
             if action == 'remove_ad':
                 d.execute("UPDATE market_ads SET status='removed' WHERE id=?", (ad['id'],))
                 d.execute("UPDATE market_listing_meta SET state='REMOVED',revision=revision+1,updated=? WHERE id=?",(now,ad['id']))

@@ -14,6 +14,7 @@ body:has(.orbit-bottom-nav:not([hidden])) main{padding-bottom:86px!important}
 .market-back{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--cyan-text)!important}
 .listing-open{min-height:76px;display:flex!important;flex-direction:column;justify-content:space-between;gap:12px}
 .listing-handle{display:block;align-self:flex-end;text-align:right;font-size:11px;font-weight:400;color:var(--muted);font-style:italic;max-width:100%;overflow-wrap:anywhere}
+.market-chat-context{display:flex;gap:8px;align-items:center;padding:6px 10px;background:var(--card);border-radius:12px;margin:4px 0}.market-chat-context a{display:flex;align-items:center;gap:8px;min-width:0;flex:1;color:var(--ink);text-decoration:none}.market-chat-context img{width:44px;height:44px;object-fit:cover;border-radius:8px}.market-chat-context strong,.market-chat-context small{display:block;font-size:12px}.market-chat-context small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}.market-chat-context button{background:transparent!important;padding:4px!important;min-width:32px!important}.market-secondary{margin:6px 0 12px}.market-secondary button{font-size:12px;min-height:40px}.orbit-notification-item.unread{border-left:3px solid var(--violet)}
 .orbit-notification-item{font-size:12px;line-height:1.45;padding:10px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line,#303651)}
 .orbit-notification-item p{font-size:12px;margin:4px 0}
 .orbit-notification-item small{font-size:10px}

@@ -38,6 +38,7 @@ def init(server):
   for ident,icon,name,subs,attrs in CATEGORIES:
    d.execute('INSERT OR IGNORE INTO market_categories(id,name,icon,subcategories,attributes) VALUES(?,?,?,?,?)',(ident,name,icon,json.dumps(subs),json.dumps(attrs)))
  __import__('market_search').init(server)
+ __import__('market_connections').init(server)
 
 def catalog(d,all=False):
  return [dict(r)|{'subcategories':json.loads(r['subcategories']),'attributes':json.loads(r['attributes'])} for r in d.execute('SELECT * FROM market_categories'+('' if all else ' WHERE enabled=1')+' ORDER BY rowid')]
@@ -104,6 +105,8 @@ def images_input(items):
 def notify(d,uid,event,listing,message):
  import account_notifications
  account_notifications.add(d,uid,'market','shop',message,{'listing':listing,'event':event})
+ for saved in d.execute('SELECT uid FROM market_saves WHERE listing=? AND uid<>?',(listing,uid)):
+  account_notifications.add(d,saved['uid'],'market','saved','Saved item changed: '+message,{'listing':listing,'event':'saved_changed'})
 
 def get(server,uid,path,q):
  arg=lambda n,default='':q.get(n,[default])[0]
@@ -182,6 +185,7 @@ def post(server,uid,action,b):
    d.execute('INSERT INTO market_listing_audit(listing,actor,action,created,revision) VALUES(?,?,?,?,?)',(ident,uid,'save:'+state,now,revision))
    if not old:d.execute('INSERT INTO market_pilot_keys VALUES(?,?,?,?)',(uid,key,fingerprint,ident))
    if state=='ACTIVE' and (not old or old['state']!='ACTIVE'):notify(d,uid,'published',ident,'Your listing is published: '+title)
+   elif old:notify(d,uid,'edited',ident,'Listing updated: '+title)
    return {'ok':True,'id':ident,'revision':revision}
  if action=='listing_state':
   with server.db() as d:

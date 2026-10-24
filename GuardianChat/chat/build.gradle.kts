@@ -22,7 +22,7 @@ dependencies {
 // Package the fork's own interface; API calls still use the configured HTTPS server.
 val comparisonAssets = tasks.register<Sync>("packageComparisonInterface") {
  from(rootProject.file("server")) {
-  include("vibe.html", "vibe.js", "vibe.css", "activity-ui.js", "navigation.css", "navigation-icons/*.svg", "private-results.js", "evidence-camera.js", "camera-sources.js", "market.html", "market.js", "market.css", "gaming.html", "gaming.js", "gaming.css", "orbit-theme.css", "orbit-theme.js", "personalization.js", "personalization.json",
+  include("market-chat.js", "vibe.html", "vibe.js", "vibe.css", "activity-ui.js", "navigation.css", "navigation-icons/*.svg", "private-results.js", "evidence-camera.js", "camera-sources.js", "market.html", "market.js", "market.css", "gaming.html", "gaming.js", "gaming.css", "orbit-theme.css", "orbit-theme.js", "personalization.js", "personalization.json",
    "studio.js", "result-room.js", "orbit-icon.png", "roboto-0.ttf", "roboto-1.ttf",
    "branding/orbit-wallpaper.png", "branding/orbit-wallpaper-v2.png",
    "branding/settings-dark.png", "branding/settings-light.png", "branding/orbit-icon-light.png",
