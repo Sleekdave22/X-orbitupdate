@@ -100,3 +100,23 @@ photo, switch to video, hold and swipe up to lock, stop, inspect preview, then d
 For a PC broadcast: start the virtual camera application → Live matches → broadcast
 controls → Find cameras → select the camera/audio → Start live camera. Verify from
 a second viewer before considering real virtual-camera streaming accepted.
+
+## Local deployment evidence
+
+Implementation commit `9a84636` is pushed to X-orbitupdate's
+`feature/private-result-review` branch. The original X-Orbit checkout remains clean
+at `bf029cea24983f58022736cb44bbb8c2e18d73ff`.
+
+The shared database passed an integrity check and was backed up before a controlled
+server restart. Both local HTTPS origins (8766 and preview 8768) serve the activated
+review/camera assets byte-for-byte from this branch. All 50 manifest hashes match.
+The live database contains all three additive review tables and remains healthy.
+
+The final APK assembled successfully and its four relevant web assets match source.
+ADB installation returned Success; installed package reports versionCode 26 and
+versionName `0.26-private-result-review`. The original saved @s21 account, shared
+server address, league API, match API and notification package identity were verified
+after installation. No uninstall, account reset or default-branch merge occurred.
+
+Physical-phone capture gestures and real-game OCR accuracy remain awaiting manual
+acceptance. Actual OBS/other virtual-camera publishing has not been demonstrated.
