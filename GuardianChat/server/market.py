@@ -78,6 +78,8 @@ def search_clause(q):
 
 
 def get(server, uid, path, query):
+    if path in ('/market/demo_wallet','/market/demo_orders','/market/demo_order'):
+        return __import__('market_demo').get(server,uid,path,query)
     if path in ('/market/saved','/market/offers','/market/offer','/market/chat_context','/market/activity'):
         return __import__('market_connections').get(server,uid,path,query)
     if path in ('/market/catalog','/market/listings','/market/listing','/market/image','/market/store','/market/mine'):
@@ -136,6 +138,8 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
+    if action in ('demo_deposit','demo_withdraw','demo_order_create','demo_order_action'):
+        return __import__('market_demo').post(server,uid,action,b)
     if action in ('save_item','offer_create','offer_action','inquiry','activity_seen'):
         return __import__('market_connections').post(server,uid,action,b)
     if action in ('save_listing','listing_state','report_seller','search_preferences'):

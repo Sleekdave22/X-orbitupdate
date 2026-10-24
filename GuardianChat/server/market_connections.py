@@ -35,7 +35,7 @@ def offer_view(d,uid,ident):
  r=d.execute('SELECT * FROM market_offers WHERE id=? AND (buyer=? OR seller=?)',(ident,uid,uid)).fetchone()
  if not r:raise ValueError('Offer unavailable')
  out=dict(r);out['history']=[dict(x) for x in d.execute('SELECT actor,event,amount_minor,created FROM market_offer_history WHERE offer=? ORDER BY id',(ident,))]
- out['listing_title']=row(d,r['listing'])['title'];return out
+ out['listing_title']=row(d,r['listing'])['title'];order=d.execute('SELECT id FROM market_demo_orders WHERE offer=?',(ident,)).fetchone();out['demo_order']=order['id'] if order else None;return out
 
 def context(d,uid,peer):
  permitted(d,uid,peer)

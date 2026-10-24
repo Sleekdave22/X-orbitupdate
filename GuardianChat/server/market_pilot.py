@@ -39,6 +39,7 @@ def init(server):
    d.execute('INSERT OR IGNORE INTO market_categories(id,name,icon,subcategories,attributes) VALUES(?,?,?,?,?)',(ident,name,icon,json.dumps(subs),json.dumps(attrs)))
  __import__('market_search').init(server)
  __import__('market_connections').init(server)
+ __import__('market_demo').init(server)
 
 def catalog(d,all=False):
  return [dict(r)|{'subcategories':json.loads(r['subcategories']),'attributes':json.loads(r['attributes'])} for r in d.execute('SELECT * FROM market_categories'+('' if all else ' WHERE enabled=1')+' ORDER BY rowid')]
@@ -80,7 +81,7 @@ def accessible(d,uid,ident,owner=False):
  return v
 
 def amount(value,currency):
- if currency not in CURRENCIES:raise ValueError('Choose a supported currency')
+ if not isinstance(currency,str) or currency not in CURRENCIES:raise ValueError('Choose a supported currency')
  try:
   dec=Decimal(str(value));factor=1 if currency=='JPY' else 100;scaled=dec*factor
   if not dec.is_finite() or dec<0 or scaled!=scaled.to_integral_value() or scaled>10**14:raise ValueError()
@@ -154,12 +155,13 @@ def post(server,uid,action,b):
    if old and old['state'] in ('REMOVED','RESERVED','SOLD','PENDING_REVIEW'):raise ValueError('This listing cannot be edited in its current state')
    if old and b.get('revision')!=old['revision']:raise ValueError('Listing changed. Reopen it before editing.')
    title=text(b.get('title',''),80,True);description=text(b.get('description',''),3000,True);category=b.get('category_id')
+   if not isinstance(category,str):raise ValueError('Choose a category')
    cat=d.execute('SELECT * FROM market_categories WHERE id=? AND enabled=1',(category,)).fetchone()
    if not cat:raise ValueError('Choose a category')
    sub=text(b.get('subcategory',''),80,True)
    if sub not in json.loads(cat['subcategories']):raise ValueError('Choose a subcategory')
    currency=b.get('currency');minor=amount(b.get('price'),currency);condition=b.get('condition');country=b.get('country');city=text(b.get('city',''),100,True)
-   if country not in COUNTRIES or condition not in CONDITIONS:raise ValueError('Choose a country and condition')
+   if not isinstance(country,str) or not isinstance(condition,str) or country not in COUNTRIES or condition not in CONDITIONS:raise ValueError('Choose a country and condition')
    attrs=b.get('attributes',{});delivery=b.get('delivery',[]);availability=b.get('availability','in_stock')
    if not isinstance(attrs,dict) or set(attrs)-set(json.loads(cat['attributes'])):raise ValueError('Unsupported category attributes')
    attrs={k:text(v,100) for k,v in attrs.items()}
