@@ -4,3 +4,4 @@ numpy<3
 opencv-python<4.12
 
 Pillow>=10,<13
+av>=16,<17

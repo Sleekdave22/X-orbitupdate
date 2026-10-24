@@ -90,6 +90,8 @@ class ChatServer(ThreadingHTTPServer):
         except Exception as error:print('Gamebox background task failed: '+type(error).__name__,flush=True)
         try:__import__("wallet").maintenance(self)
         except Exception as error:print('Test wallet maintenance failed: '+type(error).__name__,flush=True)
+        try:__import__('result_reviews').dispatch(self)
+        except Exception as error:print('Private result review unavailable: '+type(error).__name__,flush=True)
     def push_call(self,call,event):
         if not self.push.enabled:return
         targets=[call['recipient']] if event=='call_ringing' else [call['caller'],call['recipient']]
@@ -184,7 +186,7 @@ class Handler(BaseHTTPRequestHandler):
                 data=(Path(__file__).parent/'orbit-icon.png').read_bytes();self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
             if parsed.path in ('/branding/XOrbit-app-icon-1024.png','/branding/XOrbit-logo-dark.png','/branding/XOrbit-logo-light.png','/branding/orbit-wallpaper.png','/branding/orbit-wallpaper-v2.png','/branding/settings-dark.png','/branding/settings-light.png','/branding/orbit-icon-light.png'):
                 data=(Path(__file__).parent/parsed.path[1:]).read_bytes();self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
-            if parsed.path in ('/market.html','/market.js','/market.css','/calls.js','/call.html','/call-screen.js','/call-screen.css','/gaming.html','/gaming.js','/gaming.css','/studio.js','/result-room.js','/orbit-theme.js','/orbit-theme.css','/social.js','/profile-tabs.css','/social-spaces.js','/phase-b.js','/form-panels.js','/form-panels.css','/scheduling.js','/wallet.html','/wallet.js','/live-room-ui.js','/stream-relay-ui.js','/invitations.js','/join.js','/account-search.js','/sponsored-ui.js','/personalization.js','/personalization.json'):
+            if parsed.path in ('/private-results.js','/evidence-camera.js','/camera-sources.js','/market.html','/market.js','/market.css','/calls.js','/call.html','/call-screen.js','/call-screen.css','/gaming.html','/gaming.js','/gaming.css','/studio.js','/result-room.js','/orbit-theme.js','/orbit-theme.css','/social.js','/profile-tabs.css','/social-spaces.js','/phase-b.js','/form-panels.js','/form-panels.css','/scheduling.js','/wallet.html','/wallet.js','/live-room-ui.js','/stream-relay-ui.js','/invitations.js','/join.js','/account-search.js','/sponsored-ui.js','/personalization.js','/personalization.json'):
                 data=(Path(__file__).parent/parsed.path[1:]).read_bytes();self.send_response(200);self.send_header('Content-Type','application/json' if parsed.path.endswith('.json') else 'text/javascript' if parsed.path.endswith('.js') else 'text/css' if parsed.path.endswith('.css') else 'text/html');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
             if parsed.path=='/guardianchat-ca.crt':
                 data=(Path(__file__).parent.parent/'chat/src/main/res/raw/guardianchat_local_ca.crt').read_bytes();self.send_response(200);self.send_header('Content-Type','application/x-x509-ca-cert');self.send_header('Content-Disposition','attachment; filename=guardianchat-ca.crt');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
@@ -250,6 +252,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(200,gamebox_core.studio(self.server,uid));return
             if parsed.path=='/gamebox/result-state':
                 q=parse_qs(parsed.query);self.reply(200,gamebox_core.result_state(self.server,uid,q.get('room',[''])[0],int(q.get('after',['0'])[0])));return
+            if parsed.path=='/gamebox/review-video':
+                q=parse_qs(parsed.query)
+                with self.server.db() as db:
+                    match=__import__('result_reviews').match(db,q.get('room',[''])[0])
+                    if uid in (match['a'],match['b']) or not gaming.admin(db,uid):raise PermissionError('Evidence is private to an independent authorised reviewer')
+                    video=gamebox_core.row(db,'SELECT video,mime FROM result_review_videos WHERE kind=? AND match_id=? AND uid=?',(match['kind'],match['id'],q.get('player',[''])[0]))
+                    if not video or not video['video']:self.reply(404,{'error':'Recording unavailable'});return
+                self.send_response(200);self.send_header('Content-Type',video['mime']);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(video['video'])));self.end_headers();self.wfile.write(video['video']);return
             if parsed.path=='/gamebox/room':
                 q=parse_qs(parsed.query)
                 with self.server.db() as db:
@@ -259,7 +269,8 @@ class Handler(BaseHTTPRequestHandler):
                 q=parse_qs(parsed.query)
                 with self.server.db() as db:
                     mid=q.get('match',[''])[0]
-                    if not gaming.admin(db,uid):gamebox_core.participant(db,uid,mid)
+                    match=gamebox_core.row(db,'SELECT a,b FROM gb_matches WHERE id=?',(mid,))
+                    if not match or uid in (match['a'],match['b']) or not gaming.admin(db,uid):raise PermissionError('Evidence is private to an independent authorised reviewer')
                     evidence=gamebox_core.row(db,'SELECT image,mime FROM gb_evidence WHERE match=? AND uid=?',(mid,q.get('player',[''])[0]))
                     if not evidence or not evidence['image']:self.reply(404,{'error':'Evidence unavailable'});return
                 self.send_response(200);self.send_header('Content-Type',evidence['mime']);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(evidence['image'])));self.end_headers();self.wfile.write(evidence['image']);return

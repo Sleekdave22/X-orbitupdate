@@ -50,6 +50,7 @@ def init(server):
  __import__("game_identities").init(server)
  __import__("rankings").init(server);__import__('match_scheduling').init(server)
  __import__('match_streams').init(server)
+ __import__('result_reviews').init(server)
 
 def row(d,sql,args=()):
  r=d.execute(sql,args).fetchone();return dict(r) if r else None
@@ -100,9 +101,14 @@ def summary(server,uid,lid=None):
    for f in fixtures:
     f['schedule']=row(d,'SELECT * FROM gb_schedule WHERE fixture=?',(f['id'],))
     f['can_report']=uid in (f['a'],f['b']) and f['state'] not in ('confirmed','void','walkover')
+    if uid in (f['a'],f['b']):f['evidence_review']=__import__('result_reviews').status(d,dict(f,kind='fixture'),uid)
     reports=[dict(r) for r in d.execute('SELECT uid,score_a,score_b,mime,ocr FROM game_reports WHERE fixture=?',(f['id'],))] if uid in (f['a'],f['b']) or mod(d,l,uid) else []
     if l['verification']=='typed' and f['state'] not in ('confirmed','disputed','void','walkover') and uid in (f['a'],f['b']) and not any(r['uid']==uid for r in reports):reports=[{'uid':r['uid'],'submitted':True,'mime':None,'ocr':''} for r in reports]
+    if uid in (f['a'],f['b']):reports=[{'uid':r['uid'],'submitted':True,**({'score_a':r.get('score_a'),'score_b':r.get('score_b')} if r['uid']==uid else {})} for r in reports]
     f['reports']=reports;f['game_ids']={r['uid']:r['game_id'] for r in d.execute('SELECT uid,game_id FROM league_members WHERE league=? AND uid IN (?,?)',(lid,f['a'],f['b']))} if uid in (f['a'],f['b']) or mod(d,l,uid) else {};f['can_review']=mod(d,l,uid) and uid not in (f['a'],f['b']);f['audit']=[dict(r) for r in d.execute('SELECT action,details,time FROM game_audit WHERE fixture=? ORDER BY id',(f['id'],))] if f['can_review'] else []
+    if f['can_review']:
+     f['video_evidence']=[dict(r) for r in d.execute('SELECT uid,mime,created FROM result_review_videos WHERE kind=\'fixture\' AND match_id=? AND video IS NOT NULL',(f['id'],))]
+     f['evidence_review']=__import__('result_reviews').status(d,dict(f,kind='fixture'),uid)
    result['slots']=[dict(r) for r in d.execute('SELECT m.slot,m.uid,p.tag FROM league_members m JOIN game_profiles p ON p.uid=m.uid WHERE m.league=? ORDER BY m.slot',(lid,))]
    table=standings(d,lid)
    for player in table:
@@ -128,6 +134,7 @@ def image(body):
 
 def post(server,uid,action,b):
  import gamebox_core
+ if action=='report' and b.get('image'):return __import__('result_reviews').submit(server,uid,b)
  if action=='scan':
   raw,mime=image(b);return scan(server,raw,mime)
  with server.db() as d:
@@ -310,6 +317,7 @@ def post(server,uid,action,b):
   if action in ('report','confirm','dispute'):
    if uid not in (f['a'],f['b']):raise PermissionError('Only the scheduled players may submit this result')
    if f['state'] in ('confirmed','void','walkover'):raise ValueError('Result is already closed')
+   if action in ('report','confirm') and __import__('result_reviews').active(d,dict(f,kind='fixture')):raise ValueError('Private evidence is awaiting review; original reports are locked')
    if time.time()<f['opens']:raise ValueError('This match window has not opened')
    if l['verification']=='typed' and action in ('report','confirm'):
     scheduled=row(d,'SELECT * FROM gb_schedule WHERE fixture=?',(f['id'],))
@@ -351,8 +359,9 @@ def post(server,uid,action,b):
    if f['state'] not in ('pending','disputed'):raise ValueError('This result is not awaiting review')
    reason=str(b.get('reason','')).strip();a=b.get('score_a');z=b.get('score_b')
    if len(reason)<5 or len(reason)>500 or type(a)!=int or type(z)!=int or not 0<=a<=99 or not 0<=z<=99 or f['stage']!='league' and a==z:raise ValueError('Enter the reviewed score and decision reason')
-   if not d.execute('SELECT 1 FROM game_reports WHERE fixture=? AND image IS NOT NULL',(f['id'],)).fetchone():raise ValueError('Screenshot evidence is required')
-   d.execute("UPDATE fixtures SET state='confirmed',score_a=?,score_b=? WHERE id=?",(a,z,f['id']));audit(d,f['id'],uid,'moderator_approved',json.dumps({'reason':reason,'approved_score':[a,z],'original_reports':[dict(r) for r in d.execute('SELECT uid,score_a,score_b,ocr FROM game_reports WHERE fixture=?',(f['id'],))]}));advance(d,l);return {'ok':True}
+   if not d.execute('SELECT 1 FROM game_reports WHERE fixture=? AND image IS NOT NULL',(f['id'],)).fetchone() and not d.execute('SELECT 1 FROM result_review_videos WHERE kind=\'fixture\' AND match_id=? AND video IS NOT NULL',(f['id'],)).fetchone():raise ValueError('Camera evidence is required')
+   __import__('result_reviews').require_both(d,dict(f,kind='fixture'))
+   finalize_review(d,f,a,z,uid,reason);return {'ok':True}
   raise ValueError('Unknown gaming action')
 def advance(d,l):
  if l['verification']=='typed':
@@ -378,10 +387,21 @@ def advance(d,l):
 def evidence(server,uid,fid,player):
  with server.db() as d:
   f=row(d,'SELECT * FROM fixtures WHERE id=?',(fid,));l=row(d,'SELECT * FROM leagues WHERE id=?',(f['league'],)) if f else None
-  if not f or uid not in (f['a'],f['b']) and not mod(d,l,uid):raise PermissionError('This match evidence is private')
+  if not f or uid in (f['a'],f['b']) or not mod(d,l,uid):raise PermissionError('Evidence is private to an independent authorised reviewer')
   r=row(d,'SELECT image,mime FROM game_reports WHERE fixture=? AND uid=?',(fid,player))
   if not r or not r['image']:raise ValueError('Screenshot unavailable')
   return r['image'],r['mime']
+
+def finalize_review(d,f,a,b,actor,reason):
+ if f['state'] in ('confirmed','void','walkover'):raise ValueError('Result is already closed')
+ l=row(d,'SELECT * FROM leagues WHERE id=?',(f['league'],))
+ d.execute("UPDATE fixtures SET state='confirmed',score_a=?,score_b=? WHERE id=?",(a,b,f['id']))
+ audit(d,f['id'],actor,'moderator_approved' if actor!='system:local-ocr' else 'automatic_evidence_approved',json.dumps({'reason':reason,'approved_score':[a,b],'original_reports':[dict(r) for r in d.execute('SELECT uid,score_a,score_b FROM game_reports WHERE fixture=?',(f['id'],))]}))
+ advance(d,l)
+ rules=json.loads(l['policy_snapshot'] or __import__('gamebox_core').current(d)['config'])
+ d.execute('INSERT OR REPLACE INTO gb_comp_retention VALUES(?,?)',(f['id'],int(time.time())+rules['retention_seconds']))
+ __import__('result_reviews').finalized(d,'fixture',f['id'],a,b,actor,reason)
+ for uid in (f['a'],f['b']):__import__('gamebox_core').notice(d,uid,'Reviewed match result confirmed. Relevant competition standings and progression have updated.')
 
 def room(server,uid,fid):
  with server.db() as d:

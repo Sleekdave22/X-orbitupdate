@@ -47,12 +47,13 @@ class CoreTest(unittest.TestCase):
  def test_dispute_evidence_is_private_and_cannot_be_overwritten(self):
   us,m=self.ready()
   self.call('/gamebox/report',{'match':m['id'],'a':2,'b':1},us[0]['token']);self.call('/gamebox/report',{'match':m['id'],'a':1,'b':2},us[1]['token'])
-  with patch('gaming.scan',return_value={'text':'Original score and IDs','available':True}):self.call('/gamebox/evidence',{'match':m['id'],'image':account_qr('proof')},us[0]['token'])
+  self.call('/gamebox/evidence',{'match':m['id'],'image':account_qr('proof'),'capture_mode':'camera'},us[0]['token'])
   with patch('gaming.scan',return_value={'text':'replacement','available':True}):
-   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/evidence',{'match':m['id'],'image':account_qr('replacement')},us[0]['token'])
+   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/evidence',{'match':m['id'],'image':account_qr('replacement'),'capture_mode':'camera'},us[0]['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/evidence?match='+m['id']+'&player='+us[0]['id'],token=us[2]['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/review',{'match':m['id'],'a':2,'b':1,'reason':'Own match cannot be reviewed'},us[0]['token'])
   with self.server.db() as d:d.execute('DELETE FROM game_admin');d.execute('INSERT INTO game_admin VALUES(?)',(us[2]['id'],))
+  self.call('/gamebox/evidence',{'match':m['id'],'image':account_qr('other-proof'),'capture_mode':'camera'},us[1]['token'])
   self.call('/gamebox/review',{'match':m['id'],'a':2,'b':1,'reason':'Evidence reviewed against both official IDs'},us[2]['token'])
   with self.server.db() as d:e=d.execute('SELECT expires FROM gb_evidence WHERE match=?',(m['id'],)).fetchone()[0]
   gamebox_core.tick(self.server,e+1)
@@ -156,8 +157,8 @@ class CoreTest(unittest.TestCase):
   users,m=self.ready();a,b,c=users;room=m['id']
   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/result-state?room='+room,token=c['token'])
   self.call('/gamebox/result_comment',{'room':room,'text':'Checking result'},a['token'])
-  self.call('/gamebox/result_signal',{'room':room,'kind':'offer','payload':{'session':'test-session','value':{'type':'offer','sdp':'v=0\r\n'}}},a['token'])
-  received=self.call('/gamebox/result-state?room='+room,token=b['token']);self.assertEqual(len(received['signals']),1);self.assertEqual(received['comments'][0]['text'],'Checking result')
+  with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/result_signal',{'room':room,'kind':'offer','payload':{'session':'test-session','value':{'type':'offer','sdp':'v=0\r\n'}}},a['token'])
+  received=self.call('/gamebox/result-state?room='+room,token=b['token']);self.assertEqual(len(received['signals']),0);self.assertEqual(received['comments'][0]['text'],'Checking result')
   with self.assertRaises(urllib.error.HTTPError):self.call('/gamebox/result_signal',{'room':room,'kind':'photo','payload':{'session':'test','value':{'image':'private-photo'}}},a['token'])
   self.call('/gamebox/report',{'match':room,'a':3,'b':1},a['token']);self.assertEqual(self.call('/gamebox/result-state?room='+room,token=b['token'])['reports'],[])
   self.call('/gamebox/report',{'match':room,'a':3,'b':1},b['token']);final=self.call('/gamebox/result-state?room='+room,token=b['token']);self.assertEqual(final['state'],'verified')

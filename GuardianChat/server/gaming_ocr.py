@@ -15,5 +15,6 @@ def read(raw):
   if _engine is None:_engine=RapidOCR(intra_op_num_threads=2,inter_op_num_threads=2)
   result,_=_engine(pixels);text='\n'.join(r[1] for r in result or [])[:6000]
   scores=list(dict.fromkeys(pair for r in result or [] if float(r[2])>=.8 for pair in re.findall(r'\b(\d{1,2})\s*[-–]\s*(\d{1,2})\b',r[1])))
-  return {'available':True,'text':text,'scores':scores,'note':'Suggested readings only. Confirm player identities and score; authenticity is not established.'}
+  lines=[{'box':np.asarray(r[0]).tolist(),'text':str(r[1])[:300],'confidence':float(r[2])} for r in (result or [])[:200]]
+  return {'available':True,'text':text,'scores':scores,'lines':lines,'note':'Suggested readings only. Confirm player identities and score; authenticity is not established.'}
  finally:_lock.release()

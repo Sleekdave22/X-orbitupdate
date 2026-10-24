@@ -1,6 +1,6 @@
-import unittest,urllib.error
+import unittest,urllib.error,time
 from collections import Counter
-import test_server
+import test_server,result_reviews
 from server import account_qr
 class GamingTest(unittest.TestCase):
  setUp=test_server.ChatTest.setUp;tearDown=test_server.ChatTest.tearDown;call=test_server.ChatTest.call;registerBase=test_server.ChatTest.register
@@ -27,20 +27,27 @@ class GamingTest(unittest.TestCase):
   self.call('/gaming/moderator',{'league':l,'identity':us[8]['id']},us[0]['token']);self.call('/gaming/start',{'league':l},us[0]['token']);return us,l
  def view(self,l,u):return self.call('/gaming/summary?league='+l,token=u['token'])
  def result(self,f,us,l):
-  users={u['id']:u for u in us};self.call('/gaming/report',{'league':l,'fixture':f['id'],'score_a':3,'score_b':1,'image':account_qr(f['id'])},users[f['a']]['token']);self.call('/gaming/confirm',{'league':l,'fixture':f['id']},users[f['b']]['token'])
+  users={u['id']:u for u in us}
+  for uid in (f['a'],f['b']):self.call('/gamebox/result_evidence',{'room':f['id'],'image':account_qr(f['id']+uid),'capture_mode':'camera'},users[uid]['token'])
+  with self.server.db() as d:
+   gids={r['uid']:r['game_id'] for r in d.execute('SELECT uid,game_id FROM league_members WHERE league=?',(l,))}
+  reading={'available':True,'text':'Final score','lines':[{'text':'Final score','confidence':.999},{'text':gids[f['a']]+' 3','confidence':.999},{'text':gids[f['b']]+' 1','confidence':.999}]}
+  result_reviews.process_one(self.server,int(time.time())+61,reader=lambda _:reading)
  def test_scheduler_and_capacity(self):
   us,l=self.league();fs=self.view(l,us[0])['fixtures'];self.assertEqual(len(fs),28);self.assertEqual(len({tuple(sorted((f['a'],f['b']))) for f in fs}),28);self.assertEqual(set(Counter(p for f in fs for p in (f['a'],f['b'])).values()),{7})
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/join',{'league':l},us[8]['token'])
  def test_pending_permissions_and_confirmation(self):
-  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'] if us[0]['id'] not in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gaming/report',{'league':l,'fixture':f['id'],'score_a':3,'score_b':1,'image':account_qr(f['id'])},users[f['a']]['token']);self.assertTrue(all(r['points']==0 for r in self.view(l,us[0])['table']))
+  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'] if us[0]['id'] not in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gamebox/result_evidence',{'room':f['id'],'image':account_qr(f['id']+f['a']),'capture_mode':'camera'},users[f['a']]['token']);self.assertTrue(all(r['points']==0 for r in self.view(l,us[0])['table']))
   stranger=next(u for u in us[:8] if u['id'] not in (f['a'],f['b'],us[0]['id']))
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/evidence?fixture='+f['id']+'&player='+f['a'],token=stranger['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/confirm',{'league':l,'fixture':f['id']},stranger['token'])
-  self.call('/gaming/confirm',{'league':l,'fixture':f['id']},users[f['b']]['token']);self.assertEqual(self.view(l,us[0])['table'][0]['points'],3)
+  with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/confirm',{'league':l,'fixture':f['id']},users[f['b']]['token'])
+  self.result(f,us,l);self.assertEqual(self.view(l,us[0])['table'][0]['points'],3)
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/confirm',{'league':l,'fixture':f['id']},users[f['b']]['token'])
  def test_dispute_review(self):
-  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'] if us[0]['id'] not in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gaming/report',{'league':l,'fixture':f['id'],'score_a':3,'score_b':1,'image':account_qr(f['id'])},users[f['a']]['token']);self.call('/gaming/dispute',{'league':l,'fixture':f['id'],'reason':'Wrong score shown'},users[f['b']]['token'])
+  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'] if us[0]['id'] not in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gamebox/result_evidence',{'room':f['id'],'image':account_qr(f['id']),'capture_mode':'camera'},users[f['a']]['token']);self.call('/gaming/dispute',{'league':l,'fixture':f['id'],'reason':'Wrong score shown'},users[f['b']]['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/confirm',{'league':l,'fixture':f['id']},users[f['b']]['token'])
+  self.call('/gamebox/result_evidence',{'room':f['id'],'image':account_qr(f['id']+'other'),'capture_mode':'camera'},users[f['b']]['token'])
   self.call('/gaming/review',{'league':l,'fixture':f['id'],'score_a':2,'score_b':1,'reason':'Checked screenshot and both players'},us[0]['token']);self.assertEqual(next(x for x in self.view(l,us[0])['fixtures'] if x['id']==f['id'])['state'],'confirmed')
  def test_complete_final_and_consent(self):
   us,l=self.league()
@@ -63,10 +70,10 @@ class GamingTest(unittest.TestCase):
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/sponsor',{'league':l,'reward':'No prize','funded':True},a['token'])
  def test_duplicate_screenshot_is_rejected(self):
   us,l=self.league();fs=self.view(l,us[0])['fixtures'][:2];users={u['id']:u for u in us};proof=account_qr('same-proof')
-  self.call('/gaming/report',{'league':l,'fixture':fs[0]['id'],'score_a':2,'score_b':1,'image':proof},users[fs[0]['a']]['token'])
-  with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/report',{'league':l,'fixture':fs[1]['id'],'score_a':2,'score_b':1,'image':proof},users[fs[1]['a']]['token'])
+  self.call('/gaming/report',{'league':l,'fixture':fs[0]['id'],'score_a':2,'score_b':1,'image':proof,'capture_mode':'camera'},users[fs[0]['a']]['token'])
+  with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/report',{'league':l,'fixture':fs[1]['id'],'score_a':2,'score_b':1,'image':proof,'capture_mode':'camera'},users[fs[1]['a']]['token'])
  def test_organiser_cannot_approve_own_match(self):
-  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'][:4] if us[0]['id'] in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gaming/report',{'league':l,'fixture':f['id'],'score_a':2,'score_b':1,'image':account_qr(f['id'])},users[f['a']]['token'])
+  us,l=self.league();f=next(f for f in self.view(l,us[0])['fixtures'][:4] if us[0]['id'] in (f['a'],f['b']));users={u['id']:u for u in us};self.call('/gaming/report',{'league':l,'fixture':f['id'],'score_a':2,'score_b':1,'image':account_qr(f['id']),'capture_mode':'camera'},users[f['a']]['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/gaming/review',{'league':l,'fixture':f['id'],'score_a':2,'score_b':1,'reason':'I approve myself'},us[0]['token'])
  def test_static_gaming_page_does_not_require_bearer(self):
   page=self.call('/gaming.html');self.assertIn(b'OrbitPlay',page)

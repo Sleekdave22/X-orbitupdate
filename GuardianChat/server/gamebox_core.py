@@ -118,14 +118,17 @@ def summary(server,uid):
   matches=[dict(r) for r in d.execute('SELECT m.*,pa.tag name_a,pb.tag name_b FROM gb_matches m JOIN game_profiles pa ON pa.uid=m.a JOIN game_profiles pb ON pb.uid=m.b WHERE a=? OR b=? ORDER BY created DESC LIMIT 30',(uid,uid))]
   for m in matches:
    m.update(__import__('competition_context').decorate(d,m));m.pop('rules',None);m['reports']=[dict(r) for r in d.execute('SELECT * FROM gb_reports WHERE match=?',(m['id'],))]
+   m['evidence_review']=__import__('result_reviews').status(d,dict(m,kind='open'),uid)
    if m['state']=='awaiting_results' and not any(r['uid']==uid for r in m['reports']):m['reports']=[{'uid':r['uid'],'submitted':True} for r in m['reports']]
   return {'seasons':[dict(r)|{'registered':d.execute('SELECT COUNT(*) FROM gb_season_entries WHERE season=?',(r['id'],)).fetchone()[0],'joined':bool(d.execute('SELECT 1 FROM gb_season_entries WHERE season=? AND uid=?',(r['id'],uid)).fetchone()),'groups':[x[0] for x in d.execute('SELECT league FROM gb_season_groups WHERE season=? ORDER BY number',(r['id'],))]} for r in d.execute('SELECT id,name,game,tier,opens,closes,state FROM gb_seasons ORDER BY closes DESC LIMIT 30')],'version':version['id'],'config':config,'ids':[dict(r) for r in d.execute("SELECT i.* FROM gb_game_ids i JOIN gb_identity_meta m ON m.uid=i.uid AND m.game=i.game WHERE i.uid=? AND m.state='active'",(uid,))],'ratings':[dict(r)|__import__('rankings').stats(d,uid,r['game']) for r in d.execute('SELECT * FROM gb_ratings WHERE uid=?',(uid,))],'queue':row(d,'SELECT * FROM gb_queue WHERE uid=?',(uid,)),'matches':matches,'notices':__import__('match_scheduling').visible_notices(d,uid)}
 def studio(server,uid):
  with server.db() as d:
   authorised(d,uid)
-  disputes=[dict(r) for r in d.execute("SELECT * FROM gb_matches WHERE state IN ('disputed','review') ORDER BY created")]
+  disputes=[dict(r) for r in d.execute("SELECT * FROM gb_matches WHERE state IN ('disputed','review') AND a!=? AND b!=? ORDER BY created",(uid,uid))]
   for m in disputes:
    m['evidence']=[dict(r) for r in d.execute('SELECT uid,mime,reading FROM gb_evidence WHERE match=?',(m['id'],))]
+   m['video_evidence']=[dict(r) for r in d.execute('SELECT uid,mime,created FROM result_review_videos WHERE kind=\'open\' AND match_id=? AND video IS NOT NULL',(m['id'],))]
+   m['evidence_review']=__import__('result_reviews').status(d,dict(m,kind='open'),uid)
    for e in m['evidence']:
     normal=re.sub(r'[^a-z0-9]','',e['reading'].lower());e['ids_read']=all(re.sub(r'[^a-z0-9]','',m[key].lower()) in normal for key in ('gid_a','gid_b'))
   return {'published':current(d),'draft':row(d,'SELECT * FROM gb_draft WHERE id=1'),'versions':[dict(r) for r in d.execute('SELECT id,actor,reason,created FROM gb_versions ORDER BY id DESC LIMIT 20')],'limits':LIMITS,'events':[dict(r) for r in d.execute('SELECT * FROM gb_events ORDER BY id DESC LIMIT 100')],'disputes':disputes,'sanctions':[dict(r) for r in d.execute('SELECT * FROM gb_sanctions')]}
@@ -170,8 +173,11 @@ def verify(d,m,a,b,actor,reason='Matching independent typed reports'):
  d.execute('UPDATE gb_matches SET rated=? WHERE id=?',(0 if league_match else 1,m['id']));event(d,m['id'],actor,'result_verified',old={'reports':[dict(r) for r in d.execute('SELECT * FROM gb_reports WHERE match=?',(m['id'],))],'ratings':old},new={'score':[a,b],'ratings':new},reason=reason)
  rules=json.loads(m['rules']);d.execute('UPDATE gb_evidence SET expires=? WHERE match=?',(int(time.time())+rules['retention_seconds'],m['id']))
  for uid in (m['a'],m['b']):notice(d,uid,'League result verified. League points updated; global rating unchanged.' if league_match else 'Result verified. Skill rating and participation record updated.')
+ __import__('result_reviews').finalized(d,'open',m['id'],a,b,actor,reason)
 
 def post(server,uid,action,b):
+ if action in ('evidence','result_evidence'):return __import__('result_reviews').submit(server,uid,b)
+ if action=='result_signal':raise ValueError('Result evidence now uses private camera review. Reopen OrbitPlay to use the current result screen.')
  if action in ('schedule_propose','schedule_confirm'):
   return __import__('match_scheduling').post(server,uid,'propose' if action=='schedule_propose' else 'accept',dict(b,kind='fixture',match=b.get('fixture')))
  if action=='evidence':
@@ -312,7 +318,8 @@ def post(server,uid,action,b):
   if action=='review':
    authorised(d,uid);m=row(d,'SELECT * FROM gb_matches WHERE id=?',(b.get('match'),))
    if not m or uid in (m['a'],m['b']) or m['state'] not in ('review','disputed'):raise PermissionError('Only an independent administrator may review this unresolved match')
-   if not d.execute('SELECT 1 FROM gb_evidence WHERE match=? AND image IS NOT NULL',(m['id'],)).fetchone():raise ValueError('Evidence is required for review')
+   if not d.execute('SELECT 1 FROM gb_evidence WHERE match=? AND image IS NOT NULL',(m['id'],)).fetchone() and not d.execute('SELECT 1 FROM result_review_videos WHERE kind=\'open\' AND match_id=? AND video IS NOT NULL',(m['id'],)).fetchone():raise ValueError('Evidence is required for review')
+   __import__('result_reviews').require_both(d,dict(m,kind='open'))
    reason=str(b.get('reason','')).strip();a,z=b.get('a'),b.get('b')
    if len(reason)<10 or any(type(v)!=int or not 0<=v<=99 for v in (a,z)):raise ValueError('Enter scores and a reason')
    verify(d,m,a,z,uid,reason);return {'ok':True}
@@ -340,8 +347,9 @@ def post(server,uid,action,b):
   elif action=='complete':
    if m['state']!='in_progress':raise ValueError('The match has not started')
    d.execute("UPDATE gb_matches SET state='awaiting_results',deadline=? WHERE id=?",(int(time.time())+rules['result_seconds'],m['id']))
-   for u in (m['a'],m['b']):notice(d,u,'Enter scores in the fixed player order. Preserve the final result screen until both reports are accepted.')
+   for u in (m['a'],m['b']):notice(d,u,'Do not close the game result screen until the result is confirmed. Keep both gaming IDs and the score visible. Disputes may require camera photo/video proof; the evidence response deadline is 15 minutes.')
   elif action=='report':
+   if __import__('result_reviews').active(d,dict(m,kind='open')):raise ValueError('Private evidence is awaiting review; original reports are locked')
    previous=row(d,'SELECT * FROM gb_reports WHERE match=? AND uid=?',(m['id'],uid))
    if previous and (previous['a'],previous['b'])==(b.get('a'),b.get('b')):return {'ok':True,'already_submitted':True}
    if m['state']!='awaiting_results' or time.time()>m['deadline']:raise ValueError('This result needs review; the submission window is closed')
@@ -488,4 +496,6 @@ def result_state(server,uid,rid,after):
   comments=[dict(r) for r in d.execute('SELECT c.id,c.text,u.name FROM gb_result_comments c JOIN users u ON u.id=c.uid WHERE c.room=? ORDER BY c.id DESC LIMIT 100',(rid,))]
   schedule=row(d,'SELECT * FROM gb_schedule WHERE fixture=?',(rid,)) if m['kind']=='fixture' else None
   can_report=(m['state']=='awaiting_results') if m['kind']=='open' else (m['state'] not in ('confirmed','void','walkover','disputed') and time.time()>=m['opens'] and (verification=='legacy' or bool(schedule and schedule['ready_a'] and schedule['ready_b'])))
-  return {'game_ids':game_ids,'can_report':can_report,'id':rid,'kind':m['kind'],'a':m['a'],'b':m['b'],'names':names,'state':m['state'],'verification':verification,'reports':reports,'signals':signals,'comments':list(reversed(comments))}
+  review=__import__('result_reviews').status(d,m,uid)
+  if review['state']!='not_submitted':reports=[r for r in reports if r['uid']==uid]
+  return {'game_ids':game_ids,'can_report':can_report,'id':rid,'kind':m['kind'],'a':m['a'],'b':m['b'],'names':names,'state':m['state'],'verification':verification,'reports':reports,'evidence_review':review,'final_score':[m['score_a'],m['score_b']] if m['state'] in ('verified','confirmed') else None,'signals':signals,'comments':list(reversed(comments))}
