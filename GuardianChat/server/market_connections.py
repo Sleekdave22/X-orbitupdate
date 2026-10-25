@@ -39,12 +39,12 @@ def offer_view(d,uid,ident):
  out=dict(r);out['history']=[dict(x) for x in d.execute('SELECT actor,event,amount_minor,created FROM market_offer_history WHERE offer=? ORDER BY id',(ident,))]
  out['listing_title']=row(d,r['listing'])['title'];order=d.execute('SELECT id FROM market_demo_orders WHERE offer=?',(ident,)).fetchone();out['demo_order']=order['id'] if order else None;return out
 
-def context(d,uid,peer):
+def context(d,uid,peer,listing=''):
  permitted(d,uid,peer)
  can=bool(d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,peer)).fetchone())
  if not can:return {'can_chat':False,'items':[]}
  refs=[]
- for r in d.execute('SELECT listing FROM market_inquiries WHERE (buyer=? AND seller=?) OR (buyer=? AND seller=?) ORDER BY created DESC LIMIT 5',(uid,peer,peer,uid)):
+ for r in d.execute('SELECT listing FROM market_inquiries WHERE ((buyer=? AND seller=?) OR (buyer=? AND seller=?)) AND (?="" OR listing=?) ORDER BY created DESC LIMIT 5',(uid,peer,peer,uid,listing,listing)):
   try:
    v=view(d,row(d,r['listing']),uid);refs.append({k:v[k] for k in ('id','title','price','amount_minor','currency','state','images')})
   except ValueError:pass
@@ -59,7 +59,7 @@ def get(server,uid,path,q):
     try:items.append(accessible(d,uid,r['listing']))
     except ValueError:items.append({'id':r['listing'],'title':'Listing unavailable','nickname':'','uid':'','unavailable':True})
    return {'listings':items}
-  if path=='/market/chat_context':return context(d,uid,arg('peer'))
+  if path=='/market/chat_context':return context(d,uid,arg('peer'),arg('listing'))
   if path in ('/market/offers','/market/offer'):
    d.execute('BEGIN IMMEDIATE');expire(d)
    if path.endswith('/offer'):return {'offer':offer_view(d,uid,arg('id'))}
