@@ -12,6 +12,7 @@ def init(server):
  CREATE TABLE IF NOT EXISTS vibe_views(item TEXT NOT NULL,uid TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,opens INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(item,uid));
  CREATE TABLE IF NOT EXISTS vibe_reactions(item TEXT NOT NULL,uid TEXT NOT NULL,emoji TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(item,uid));
  CREATE INDEX IF NOT EXISTS vibe_active ON vibe_items(expires,uid,visibility);
+ CREATE TABLE IF NOT EXISTS vibe_replies(message_id INTEGER PRIMARY KEY,item TEXT NOT NULL,visibility TEXT NOT NULL,sender TEXT NOT NULL,client_id TEXT NOT NULL,UNIQUE(sender,client_id));
  ''')
 
 def preferences(d,uid):
@@ -36,12 +37,27 @@ def get(server,uid,action,q):
    visibility=q.get('visibility',['public'])[0]
    if visibility not in ('public','private'):raise ValueError('Choose Public or Private Vibe')
    groups={}
-   for r in d.execute('SELECT i.id,i.uid,i.visibility,i.mime,i.caption,i.created,i.expires,1 AS media,u.name,u.nickname FROM vibe_items i JOIN users u ON u.id=i.uid WHERE i.visibility=? AND i.expires>? AND i.media IS NOT NULL ORDER BY i.created,i.id',(visibility,int(time.time()))):
+   for r in d.execute('SELECT i.id,i.uid,i.visibility,i.mime,i.caption,i.created,i.expires,1 AS media,u.name,u.nickname,u.avatar,u.avatar_mime FROM vibe_items i JOIN users u ON u.id=i.uid WHERE i.visibility=? AND i.expires>? AND i.media IS NOT NULL ORDER BY i.created,i.id',(visibility,int(time.time()))):
     if not allowed(d,uid,r):continue
-    group=groups.setdefault(r['uid'],{'uid':r['uid'],'name':r['name'],'nickname':r['nickname'],'items':[]})
+    contact=bool(d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,r['uid'])).fetchone())
+    group=groups.setdefault(r['uid'],{'uid':r['uid'],'name':r['name'],'nickname':r['nickname'],'contact':contact,'avatar':r['avatar'] if contact or r['uid']==uid else None,'avatar_mime':r['avatar_mime'] if contact or r['uid']==uid else None,'items':[]})
     v=d.execute('SELECT 1 FROM vibe_views WHERE item=? AND uid=?',(r['id'],uid)).fetchone()
     group['items'].append({'id':r['id'],'created':r['created'],'expires':r['expires'],'caption':r['caption'] if visibility=='public' or r['uid']==uid else '', 'mime':r['mime'],'viewed':bool(v),'views':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(r['id'],)).fetchone()[0] if r['uid']==uid else None})
-   return {'groups':list(groups.values()),'preferences':preferences(d,uid),'emoji':EMOJI}
+   own=d.execute('SELECT id,name,nickname,avatar,avatar_mime FROM users WHERE id=?',(uid,)).fetchone()
+   return {'groups':list(groups.values()),'account':dict(own),'preferences':preferences(d,uid),'emoji':EMOJI}
+  if action=='preview':
+   r=item(d,uid,q.get('id',[''])[0])
+   # Private media stays in the protected viewer, including thumbnails.
+   if r['visibility']=='private':raise PermissionError('Private previews stay in the protected viewer')
+   from PIL import ImageOps
+   if r['mime'].startswith('image/'):
+    with Image.open(io.BytesIO(r['media'])) as im:preview=ImageOps.exif_transpose(im).convert('RGB')
+   else:
+    import av
+    with av.open(io.BytesIO(r['media'])) as container:
+     preview=next(container.decode(video=0)).to_image().convert('RGB')
+   preview.thumbnail((160,160));out=io.BytesIO();preview.save(out,format='JPEG',quality=75)
+   return {'data':base64.b64encode(out.getvalue()).decode(),'mime':'image/jpeg','expires':r['expires']}
   if action=='status':
    r=item(d,uid,q.get('id',[''])[0]);return {'active':True,'expires':r['expires']}
   if action=='viewers':
@@ -120,6 +136,29 @@ def post(server,uid,action,b):
    if r['uid']!=uid:raise PermissionError('Only the author can remove this Vibe')
    d.execute('UPDATE vibe_items SET expires=?,media=NULL WHERE id=?',(now,r['id']));return {'ok':True}
   raise ValueError('Unknown Vibe action')
+
+def reply(server,uid,b):
+ """Send from the viewer using the existing contact, block and push contracts."""
+ ident=str(b.get('id',''));client=b.get('client_id');text=b.get('text')
+ if not isinstance(client,str) or not 1<=len(client)<=80 or not isinstance(text,str) or not 1<=len(text.strip())<=3800:raise ValueError('Write a reply of up to 3800 characters')
+ text=text.strip()
+ with server.db() as d:
+  d.execute('BEGIN IMMEDIATE')
+  prior=d.execute('SELECT v.item,m.id,m.text,m.recipient FROM vibe_replies v JOIN messages m ON m.id=v.message_id WHERE v.sender=? AND v.client_id=?',(uid,client)).fetchone()
+  if prior:
+   if prior['item']!=ident or prior['text'].split('\n',1)[-1]!=text:raise ValueError('This retry belongs to another reply')
+   __import__('social').ensure(d,uid,prior['recipient'])
+   return {'id':prior['id'],'sent':True}
+  r=item(d,uid,ident);target=r['uid']
+  if target==uid:raise ValueError('Choose a contact’s Vibe to reply')
+  if not d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone():raise PermissionError('Add this account to your chats before replying')
+  if d.execute('SELECT 1 FROM messages WHERE sender=? AND client_id=?',(uid,client)).fetchone():raise ValueError('This retry key belongs to another message')
+  heading='↪ Reply to your '+('Private Vibe' if r['visibility']=='private' else 'Vibe')
+  mid=d.execute('INSERT INTO messages(sender,recipient,text,time,client_id,size) VALUES(?,?,?,?,?,0)',(uid,target,heading+'\n'+text,int(time.time()*1000),client)).lastrowid
+  d.execute('INSERT INTO vibe_replies VALUES(?,?,?,?,?)',(mid,ident,r['visibility'],uid,client))
+  d.execute('DELETE FROM chat_hidden WHERE owner=? AND peer=?',(uid,target))
+ __import__('message_notifications').dispatch(server,mid)
+ return {'id':mid,'sent':True}
 
 def purge(server):
  with server.db() as d:

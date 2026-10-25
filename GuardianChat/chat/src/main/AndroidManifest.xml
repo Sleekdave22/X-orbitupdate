@@ -5,7 +5,7 @@
  <uses-permission android:name="android.permission.RECORD_AUDIO" /><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
  <uses-feature android:name="android.hardware.camera.front" android:required="false" />
- <application android:name=".GuardianChatApp" android:label="X_ORBIT" android:icon="@mipmap/ic_launcher_orbit" android:roundIcon="@mipmap/ic_launcher_orbit" android:allowBackup="false" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config" android:theme="@style/Theme.XOrbit" android:supportsRtl="true">
+ <application android:name=".GuardianChatApp" android:label="X_ORBIT" android:icon="@drawable/orbit_plain" android:roundIcon="@drawable/orbit_plain" android:allowBackup="false" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config" android:theme="@style/Theme.XOrbit" android:supportsRtl="true">
   <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.clipboard" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/clipboard_paths" /></provider>
   <service android:name=".GameplayBroadcastService" android:exported="false" android:foregroundServiceType="mediaProjection" android:stopWithTask="true" />
   <service android:name=".CallPushService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>

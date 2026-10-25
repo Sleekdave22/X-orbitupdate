@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
- <style name="Theme.XOrbit" parent="android:Theme.Material.NoActionBar">
+ <style name="Theme.XOrbit.Base" parent="android:Theme.Material.NoActionBar">
   <item name="android:windowBackground">#0B1520</item>
   <item name="android:colorPrimary">#7C3AED</item>
   <item name="android:colorAccent">#22D3EE</item>
@@ -11,4 +11,5 @@
   <item name="android:fontFamily">@font/orbit_body</item>
   <item name="android:colorControlHighlight">#3322D3EE</item>
  </style>
+ <style name="Theme.XOrbit" parent="Theme.XOrbit.Base"/>
 </resources>

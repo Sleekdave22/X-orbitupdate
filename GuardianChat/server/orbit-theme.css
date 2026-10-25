@@ -18,8 +18,8 @@ html[data-theme=bright]{
  --cyan-text:#0e7490;--mint:#047857;--coral:#be123c;--amber-text:#8a5a00;color-scheme:light
 }
 *{box-sizing:border-box}
-html{--orbit-wallpaper:url('/branding/orbit-wallpaper.png?v=19');--orbit-settings-wallpaper:url('/branding/settings-dark.png?v=20');--orbit-play-icon:url('/orbit-icon.png?v=20');--pair-wallpaper:var(--personal-wallpaper-dark,linear-gradient(transparent,transparent));--brand-heading:var(--personal-heading-dark,var(--cyan-text));background:var(--bg);scrollbar-color:var(--control-line) var(--card)}
-html[data-theme=bright]{--orbit-wallpaper:url('/branding/orbit-wallpaper-v2.png?v=19');--orbit-settings-wallpaper:url('/branding/settings-light.png?v=20');--orbit-play-icon:url('/branding/orbit-icon-light.png?v=20');--pair-wallpaper:var(--personal-wallpaper-light,linear-gradient(transparent,transparent));--brand-heading:var(--personal-heading-light,var(--cyan-text))}
+html{--orbit-wallpaper:url('/branding/orbit-wallpaper.png?v=19');--orbit-settings-wallpaper:url('/branding/settings-dark.png?v=20');--orbit-play-icon:url('/branding/orbit-icon-plain.png?v=29');--pair-wallpaper:var(--personal-wallpaper-dark,linear-gradient(transparent,transparent));--brand-heading:var(--personal-heading-dark,var(--cyan-text));background:var(--bg);scrollbar-color:var(--control-line) var(--card)}
+html[data-theme=bright]{--orbit-wallpaper:url('/branding/orbit-wallpaper-v2.png?v=19');--orbit-settings-wallpaper:url('/branding/settings-light.png?v=20');--orbit-play-icon:url('/branding/orbit-icon-plain.png?v=29');--pair-wallpaper:var(--personal-wallpaper-light,linear-gradient(transparent,transparent));--brand-heading:var(--personal-heading-light,var(--cyan-text))}
 body{margin:0;background:var(--bg)!important;background-image:var(--pair-wallpaper),var(--orbit-wallpaper)!important;background-position:center top!important;background-size:cover!important;background-attachment:fixed!important;background-blend-mode:color,normal;color:var(--ink)!important;font-family:var(--body)!important;line-height:1.5}
 @media(min-width:700px){body{background-size:560px auto!important;background-repeat:repeat!important}}
 /* Arena artwork covers the viewport even when the current tab has little content. */
@@ -166,8 +166,9 @@ label:has(input[type=checkbox]) input{width:20px;flex:none;margin:0}
 html[data-theme=bright][data-palette=orbit-cyan-navy] #chat .message:not(.own) .message-body{background:var(--card2)!important;color:var(--ink)!important}
 .call-actions button{border-radius:50%!important;min-height:64px;min-width:64px}
 
-.orbit-entry-ring{width:112px;height:112px;padding:4px;background:linear-gradient(135deg,var(--violet),var(--cyan));border-radius:30px;display:grid;place-items:center;margin-bottom:24px}
-.orbit-entry-ring img{display:block;width:104px;height:104px;object-fit:contain;border:0!important;outline:0!important;border-radius:26px!important}
+.orbit-entry-ring{width:112px;height:112px;padding:0;background:transparent;border-radius:0;display:grid;place-items:center;margin-bottom:24px}
+.orbit-entry-ring img{display:block;width:104px;height:104px;object-fit:contain;border:0!important;outline:0!important;border-radius:0!important}
+.auth-welcome img{border:0!important;outline:0!important;border-radius:0!important;background:transparent!important}
 
 /* Chat controls: bare glyphs, generous hit targets, and a separate action row. */
 #chat .head{gap:6px!important;padding:8px 12px 8px 6px!important;min-width:0}
