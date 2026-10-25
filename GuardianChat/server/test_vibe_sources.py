@@ -6,7 +6,7 @@ class UnifiedVibeTest(unittest.TestCase):
  setUp=test_market_pilot.MarketPilotTest.setUp;tearDown=test_market_pilot.MarketPilotTest.tearDown;call=test_market_pilot.MarketPilotTest.call;register=test_market_pilot.MarketPilotTest.register
  shop=test_market_pilot.MarketPilotTest.shop;body=test_market_pilot.MarketPilotTest.body;save=test_market_pilot.MarketPilotTest.save
  user=test_phase_b.PhaseBTest.user;identity=test_phase_b.PhaseBTest.identity;rated=test_phase_b.PhaseBTest.rated
- def share(self,u,kind,source,**extra):return self.call('/vibe/share',dict(kind=kind,source=source,visibility='public',client_id='share-'+str(time.time_ns()),**extra),u['token'])
+ def share(self,u,kind,source,**extra):return self.call('/vibe/share',dict(kind=kind,source=source,visibility='public',client_id='share-'+str(time.time_ns()))|extra,u['token'])
  def test_market_journey_source_reference_follow_inquiry_and_expiration(self):
   seller=self.shop();buyer=self.register('Buyer');listing=self.save(seller,self.body())['id'];post=self.share(seller,'market',listing)
   with self.server.db() as d:
@@ -68,5 +68,31 @@ class UnifiedVibeTest(unittest.TestCase):
   with self.assertRaises(urllib.error.HTTPError):self.call('/vibe/milestone_policy',{'thresholds':[5],'reason':'New policy'},a['token'])
   with self.server.db() as d:d.execute('INSERT INTO game_admin VALUES(?)',(a['id'],))
   self.call('/vibe/milestone_policy',{'thresholds':[5,20],'reason':'Season launch thresholds'},a['token']);self.assertEqual(self.call('/vibe/milestone_policy',token=a['token'])['thresholds'],[5,20])
+ def test_championship_validation_sharing_and_correction_preserve_original(self):
+  import gaming,uuid
+  a=self.user('Champion');b=self.user('Runner');self.identity(a);self.identity(b)
+  with self.server.db() as d:d.execute('INSERT INTO game_admin VALUES(?)',(a['id'],))
+  lid=self.call('/gaming/create',{'game':'efootball','name':'Vibe Championship'},a['token'])['id'];fid=uuid.uuid4().hex
+  with self.server.db() as d:
+   d.execute("INSERT INTO fixtures(id,league,round,a,b,state,score_a,score_b,stage) VALUES(?,?,9,?,?,'disputed',3,1,'final')",(fid,lid,a['id'],b['id']))
+  self.assertEqual(self.call('/vibe/prompts',token=a['token'])['prompts'],[])
+  with self.server.db() as d:
+   d.execute("UPDATE fixtures SET state='confirmed' WHERE id=?",(fid,));league=dict(d.execute('SELECT * FROM leagues WHERE id=?',(lid,)).fetchone());gaming.advance(d,league)
+  prompt=self.call('/vibe/prompts',token=a['token'])['prompts'][0];self.assertEqual(prompt['kind'],'trophy')
+  post=self.share(a,'trophy',lid,game='efootball');media=self.call('/vibe/media?id='+post['id'],token=b['token']);self.assertEqual(media['source']['status'],'Verified trophy')
+  self.assertEqual(len(self.call('/vibe/achievements?id='+a['id']+'&game=efootball',token=b['token'])['achievements']),1)
+  with self.server.db() as d:d.execute('UPDATE leagues SET champion=? WHERE id=?',(b['id'],lid))
+  self.assertFalse(self.call('/vibe/media?id='+post['id'],token=b['token'])['source']['available'])
+  with self.server.db() as d:d.execute('UPDATE vibe_items SET expires=1 WHERE id=?',(post['id'],))
+  vibes.purge(self.server)
+  with self.server.db() as d:self.assertEqual(d.execute('SELECT champion FROM leagues WHERE id=?',(lid,)).fetchone()[0],b['id'])
+ def test_private_follow_requires_acceptance_and_profile_acl_remains_enforced(self):
+  a=self.user('Private');b=self.user('Follower');self.identity(a);self.identity(b)
+  self.call('/contacts',{'code':b['id']},a['token'])
+  self.call('/social/settings',{'private':True,'discoverable':False,'bio':'','alerts':True},a['token'])
+  with self.assertRaises(urllib.error.HTTPError):self.share(a,'profile',a['id'],game='efootball',visibility='private',audience=[b['id']])
+  self.call('/social/follow',{'target':a['id']},b['token']);self.assertEqual(self.call('/social/profile?id='+a['id'],token=b['token'])['relationship'],'pending')
+  self.call('/social/accept',{'target':b['id']},a['token'])
+  post=self.share(a,'profile',a['id'],game='efootball',visibility='private',audience=[b['id']]);self.assertTrue(self.call('/vibe/media?id='+post['id']+'&protected=1',token=b['token'])['source']['available'])
 
 if __name__=='__main__':unittest.main()

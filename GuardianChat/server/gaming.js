@@ -19,7 +19,7 @@ async function load({background=false}={}){
   data=results[0];data.sponsored=results[4];data.live_streams=results[3].streams||[];data.engine=results[1];data.account_profile=results[2];showTopGamingProfile();applyPresentation(data.engine.config);applyPublishedTheme(data.engine.config);updateStreamNavigation();
   if($('notice').textContent==='Still connecting. Please wait a moment.')note('');
   if(background&&mounted?.tab===tab&&mounted.admin===data.can_admin){updateGamingSponsor();mounted.refresh()}else render();
-  routeScheduledMatch();routeLiveMatch();
+  routeScheduledMatch();routeLiveMatch();await routeVibeGaming();if(!new URLSearchParams(location.search).has('from_vibe'))offerGamingVibe();
  }catch(e){if(revision===loadRevision&&tab===startTab&&lid===startLeague)note(e.message)}
 }
 function updateStreamNavigation(){if(!data)return;const invites=(data.stream_rooms||[]).filter(r=>!r.public&&r.invitation==='invited').length,label=invites?'Live matches ('+invites+')':'Live matches',button=document.querySelector('[data-tab=streams]');if(button.textContent!==label)button.textContent=label;document.querySelector('[data-tab=admin]').hidden=!data.can_admin;document.querySelector('[data-tab=studio]').hidden=!data.can_admin}
@@ -178,3 +178,5 @@ async function loadCreatorSuggestions(host){try{const d=await api('/social/sugge
 $('communityHub').onclick=()=>openSocialSpaces();$('squadHub').onclick=()=>openSocialSpaces('squads');
 
 let scheduledRouteHandled=false;function routeScheduledMatch(){const direct=new URLSearchParams(location.search);if(direct.has('result')||direct.has('notice'))return;if(scheduledRouteHandled)return;const q=new URLSearchParams(location.search),id=q.get('match'),kind=q.get('match_kind');if(id&&/^[a-f0-9]{32}$/.test(id)&&['open','fixture'].includes(kind)){scheduledRouteHandled=true;openScheduledMatch(id,kind)}}
+
+let vibeGamingRouted=false;async function routeVibeGaming(){if(vibeGamingRouted)return;vibeGamingRouted=true;const q=new URLSearchParams(location.search);if(q.has("from_vibe")){const back=button("‹ Back to Vibe",()=>{if(native&&GuardianGaming.returnVibe)GuardianGaming.returnVibe();else location.assign(OrbitVibeReturn.url(account))});$("view").prepend(back)}if(q.get("vibe_player"))await openRankProfile(q.get("vibe_player"),q.get("game"));if(q.get("vibe_sponsored")){tab="sponsored";render()}}

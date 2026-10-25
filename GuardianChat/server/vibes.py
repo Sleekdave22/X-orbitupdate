@@ -44,6 +44,14 @@ def item(d,uid,ident):
 def get(server,uid,action,q):
  with server.db() as d:
   if action=='prompts':return {'prompts':__import__('vibe_sources').prompts(d,uid)}
+  if action=='achievements':
+   target=q.get('id',[uid])[0];game=q.get('game',[''])[0]
+   records=[]
+   for source in __import__('vibe_sources').prompts(d,target,True):
+    if game and source['game']!=game:continue
+    try:records.append(__import__('vibe_sources').resolve(d,uid,target,source['kind'],source['source'],source['game']))
+    except (ValueError,PermissionError):continue
+   return {'achievements':records}
   if action=='item':
    r=item(d,uid,q.get('id',[''])[0]);u=d.execute('SELECT id,name,nickname FROM users WHERE id=?',(r['uid'],)).fetchone()
    return {'group':dict(u)|{'uid':r['uid'],'items':[{'id':r['id'],'expires':r['expires'],'viewed':False}]},'visibility':r['visibility']}
@@ -60,7 +68,8 @@ def get(server,uid,action,q):
     following=bool(d.execute("SELECT 1 FROM social_follows WHERE follower=? AND target=? AND state='accepted'",(uid,r['uid'])).fetchone())
     group=groups.setdefault(r['uid'],{'uid':r['uid'],'name':r['name'],'nickname':r['nickname'],'contact':contact,'following':following,'avatar':r['avatar'] if contact or r['uid']==uid else None,'avatar_mime':r['avatar_mime'] if contact or r['uid']==uid else None,'items':[]})
     v=d.execute('SELECT 1 FROM vibe_views WHERE item=? AND uid=?',(r['id'],uid)).fetchone()
-    group['items'].append({'id':r['id'],'created':r['created'],'expires':r['expires'],'caption':r['caption'] if visibility=='public' or r['uid']==uid else '', 'mime':r['mime'],'viewed':bool(v),'views':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(r['id'],)).fetchone()[0] if r['uid']==uid else None})
+    source=__import__('vibe_sources').linked(d,uid,r)
+    group['items'].append({'source_version':hashlib.sha256(json.dumps(source,sort_keys=True).encode()).hexdigest() if source else None,'id':r['id'],'created':r['created'],'expires':r['expires'],'caption':r['caption'] if visibility=='public' or r['uid']==uid else '', 'mime':r['mime'],'viewed':bool(v),'views':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(r['id'],)).fetchone()[0] if r['uid']==uid else None})
    own=d.execute('SELECT id,name,nickname,avatar,avatar_mime FROM users WHERE id=?',(uid,)).fetchone()
    return {'groups':list(groups.values()),'account':dict(own),'preferences':preferences(d,uid),'emoji':EMOJI}
   if action=='preview':
@@ -79,7 +88,7 @@ def get(server,uid,action,q):
    preview.thumbnail((160,160));out=io.BytesIO();preview.save(out,format='JPEG',quality=75)
    return {'data':base64.b64encode(out.getvalue()).decode(),'mime':'image/jpeg','expires':r['expires']}
   if action=='status':
-   r=item(d,uid,q.get('id',[''])[0]);source=__import__('vibe_sources').linked(d,uid,r);return {'active':True,'expires':r['expires'],'source':source if r['visibility']=='public' else None}
+   r=item(d,uid,q.get('id',[''])[0]);source=__import__('vibe_sources').linked(d,uid,r);return {'active':True,'expires':r['expires'],'source':source if r['visibility']=='public' else None,'source_available':source is None or source['available']}
   if action=='viewers':
    r=item(d,uid,q.get('id',[''])[0])
    if r['uid']!=uid:raise PermissionError('Only the author can inspect viewers')

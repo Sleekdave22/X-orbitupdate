@@ -51,8 +51,8 @@ def resolve(d,viewer,owner,kind,source,game='',publishing=False,visibility='priv
   l=sponsored_leagues.get_league(d,source)
   standing=next((s for s in sponsored_leagues.table(d,source) if s['uid']==owner),None)
   if l['game']!=game or l['state'] not in ('COMPLETED','ARCHIVED') or not l['final_snapshot'] or not standing or standing['position']!=1 or standing['played']<1:raise ValueError('No finalized league victory is available')
-  results=d.execute('SELECT r.*,m.state FROM sl_results r JOIN gb_matches m ON m.id=r.match WHERE r.league=?',(source,)).fetchall()
-  if not results or any(r['state']!='verified' for r in results) or d.execute("SELECT 1 FROM sl_appeals a JOIN sl_results r ON r.match=a.match WHERE r.league=? AND a.state='pending'",(source,)).fetchone():raise ValueError('League results are under review')
+  results=d.execute('SELECT r.*,m.state,m.score_a AS actual_a,m.score_b AS actual_b FROM sl_results r JOIN gb_matches m ON m.id=r.match WHERE r.league=?',(source,)).fetchall()
+  if not results or any(r['state']!='verified' or r['score_a']!=r['actual_a'] or r['score_b']!=r['actual_b'] for r in results) or d.execute("SELECT 1 FROM sl_appeals a JOIN sl_results r ON r.match=a.match WHERE r.league=? AND a.state='pending'",(source,)).fetchone():raise ValueError('League results are under review')
   result.update(title='X-ORBIT CHAMPION',detail=l['name']+' · League Winner',status='Verified trophy',version=hashlib.sha256(json.dumps([dict(r) for r in results],sort_keys=True).encode()).hexdigest(),achievement_url='/gaming.html?vibe_sponsored='+source)
  else:
   r=d.execute('SELECT v.*,h.kind,h.source,h.rating_after FROM vibe_rank_milestones v JOIN gb_rank_history h ON h.id=v.history WHERE v.id=? AND v.uid=? AND v.game=?',(source,owner,game)).fetchone()
@@ -70,7 +70,7 @@ def linked(d,viewer,item):
 def card(d,source):
  """Rendered on read; the database only holds the original source reference."""
  im=Image.new('RGB',(720,960),'#091020');draw=ImageDraw.Draw(im)
- font_path=Path(__file__).parent/'fonts'/'Inter-Regular.ttf'
+ font_path=Path(__file__).parent/'vibe-body.ttf'
  if not font_path.exists():font_path=Path(__file__).parent/'roboto-0.ttf'
  def font(size):
   try:return ImageFont.truetype(str(font_path),size)
@@ -81,7 +81,7 @@ def card(d,source):
   if r:
    with Image.open(io.BytesIO(r[0])) as picture:im.paste(ImageOps.contain(picture.convert('RGB'),(656,420)),(32,32))
    y=480
- for text,size,color in [(source.get('handle',''),26,'#22d3ee'),(source['title'],36,'#f4f5fa'),(source.get('price',''),30,'#34d399'),(source.get('gaming_id',''),25,'#adb4c5'),(source.get('detail',''),24,'#f4f5fa'),(source.get('status',''),22,'#adb4c5')]:
+ for text,size,color in [(source.get('handle',''),26,'#22d3ee'),(source['title'],36,'#f4f5fa'),(source.get('price',''),30,'#34d399'),(source.get('name',''),28,'#f4f5fa'),((__import__('gaming').GAMES.get(source.get('game'),'')+' ID: '+source['gaming_id']) if source.get('gaming_id') else '',25,'#adb4c5'),(source.get('detail',''),24,'#f4f5fa'),(source.get('status',''),22,'#adb4c5')]:
   for line in textwrap.wrap(str(text),width=32 if size>=30 else 44):
    draw.text((32,y),line,font=font(size),fill=color);y+=size+10
    if y>910:break
@@ -125,14 +125,14 @@ def recognize(d,game):
   for threshold in thresholds:
    if position<=threshold:d.execute('INSERT OR IGNORE INTO vibe_rank_milestones VALUES(?,?,?,?,?,?)',(uuid.uuid4().hex,r['uid'],game,threshold,h[0],int(time.time())))
 
-def prompts(d,uid):
+def prompts(d,uid,include_shared=False):
  candidates=[]
  for r in d.execute("SELECT id,game FROM leagues WHERE champion=? AND state='finished'",(uid,)):candidates.append(('trophy',r['id'],r['game']))
  for r in d.execute("SELECT DISTINCT l.id,l.game FROM sl_leagues l JOIN sl_standings s ON s.league=l.id WHERE s.uid=? AND l.state IN ('COMPLETED','ARCHIVED')",(uid,)):candidates.append(('sponsored',r['id'],r['game']))
  for r in d.execute('SELECT id,game FROM vibe_rank_milestones WHERE uid=?',(uid,)):candidates.append(('milestone',r['id'],r['game']))
  output=[]
  for kind,source,game in candidates:
-  if d.execute('SELECT 1 FROM vibe_prompt_dismissals WHERE uid=? AND kind=? AND source=?',(uid,kind,source)).fetchone() or d.execute('SELECT 1 FROM vibe_links l JOIN vibe_items i ON i.id=l.item WHERE i.uid=? AND l.kind=? AND l.source=?',(uid,kind,source)).fetchone():continue
+  if not include_shared and (d.execute('SELECT 1 FROM vibe_prompt_dismissals WHERE uid=? AND kind=? AND source=?',(uid,kind,source)).fetchone() or d.execute('SELECT 1 FROM vibe_links l JOIN vibe_items i ON i.id=l.item WHERE i.uid=? AND l.kind=? AND l.source=?',(uid,kind,source)).fetchone()):continue
   try:output.append(resolve(d,uid,uid,kind,source,game))
   except (ValueError,PermissionError):continue
  return output
