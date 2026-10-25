@@ -60,9 +60,13 @@ def search(d,uid,items,q):
   elif corrected and sum(hits)>=max(1,len(corrected)//2) and all(t in weights for t in numeric):related.append((score,item))
  def rank(pair):
   score,v=pair
-  return (-score, v['amount_minor'] if budget and v['amount_minor'] is not None else 10**15,-v['created'],v['id'])
+  return (-score,-int(v.get('featured',0)),v['amount_minor'] if budget and v['amount_minor'] is not None else 10**15,-v['created'],v['id'])
  exact.sort(key=rank);related.sort(key=rank);offset=max(0,min(100000,int(arg('offset','0'))))
- return {'listings':[v for _,v in exact[offset:offset+20]],'more':len(exact)>offset+20,'total':len(exact),'related':[v for _,v in related[:8]] if not exact else [],'interpretation':' '.join(corrected) if changes else None,'original_query':query,'location':{'mode':mode,'country':country,'city':city},'engine':'lexical-v1','semantic_enabled':False}
+ favorites={r[0] for r in d.execute('SELECT DISTINCT m.category_id FROM market_saves s JOIN market_listing_meta m ON m.id=s.listing WHERE s.uid=?',(uid,))}
+ page=[v for _,v in exact[offset:offset+20]]
+ recommendations=sorted(page,key=lambda v:(-int(v.get('featured',0)),-int(v['category_id'] in favorites),-v['created'],v['id']))[:4] if not query and not arg('category') and not offset and len(page)>4 else []
+
+ return {'listings':[v for _,v in exact[offset:offset+20]],'more':len(exact)>offset+20,'total':len(exact),'related':[v for _,v in related[:8]] if not exact else [],'interpretation':' '.join(corrected) if changes else None,'original_query':query,'location':{'mode':mode,'country':country,'city':city},'recommendations':recommendations,'recommendation_basis':'Featured listings, saved categories and recent discoveries','engine':'lexical-v1','semantic_enabled':False}
 
 def save_preferences(server,uid,b):
  from market_pilot import COUNTRIES,text

@@ -78,9 +78,10 @@ def search_clause(q):
 
 
 def get(server, uid, path, query):
+    if path=='/market/admin':return __import__('market_admin').get(server,uid)
     if path in ('/market/demo_wallet','/market/demo_orders','/market/demo_order'):
         return __import__('market_demo').get(server,uid,path,query)
-    if path in ('/market/saved','/market/offers','/market/offer','/market/chat_context','/market/activity'):
+    if path in ('/market/saved','/market/offers','/market/offer','/market/chat_context','/market/activity','/market/activity_item'):
         return __import__('market_connections').get(server,uid,path,query)
     if path in ('/market/catalog','/market/listings','/market/listing','/market/image','/market/store','/market/mine'):
         return __import__('market_pilot').get(server,uid,path,query)
@@ -138,6 +139,8 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
+    if action in ('admin_config','admin_category','admin_seller','admin_feature','admin_synonym'):
+        return __import__('market_admin').post(server,uid,action,b)
     if action in ('demo_deposit','demo_withdraw','demo_order_create','demo_order_action'):
         return __import__('market_demo').post(server,uid,action,b)
     if action in ('save_item','offer_create','offer_action','inquiry','activity_seen'):
@@ -147,6 +150,7 @@ def post(server, uid, action, b):
     now = int(time.time())
     with server.db() as d:
         d.execute('BEGIN IMMEDIATE')
+        policy=__import__('market_admin').settings(d)
         mine = account_of(d, uid)
         if action == 'register':
             if mine:
@@ -166,6 +170,8 @@ def post(server, uid, action, b):
                 raise ValueError('Advert not found')
             if d.execute('SELECT 1 FROM market_reservations WHERE listing=?',(ad['id'],)).fetchone():raise ValueError('Resolve the active reservation or demo order before removing this listing')
             d.execute('UPDATE market_ads SET status=? WHERE id=?', ('active' if action == 'admin_restore' else 'removed', ad['id']))
+            if action=='admin_restore':d.execute('UPDATE market_ads SET expires=max(expires,?) WHERE id=?',(now+policy['life_days']*86400,ad['id']))
+            __import__('market_admin').audit(d,uid,action,ad['id'],str(b.get('reason') or 'Legacy Market moderation'),None,{'status':'active' if action=='admin_restore' else 'removed'})
             d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',('ACTIVE' if action=='admin_restore' else 'REMOVED',now,ad['id']))
             __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert was '+('restored' if action=='admin_restore' else 'removed after review')+'.',{'ad':ad['id']})
             if action == 'admin_restore':
@@ -200,13 +206,14 @@ def post(server, uid, action, b):
             if category not in CATEGORIES:
                 raise ValueError('Choose a category')
             live = d.execute("SELECT COUNT(*) FROM market_ads WHERE uid=? AND status IN ('active','held') AND expires>?", (uid, now)).fetchone()[0]
-            if live >= MAX_ACTIVE_ADS:
+            if live >= policy['max_listings']:
                 raise ValueError('You can have %d live adverts. Remove one first.' % MAX_ACTIVE_ADS)
-            if d.execute('SELECT COUNT(*) FROM market_ads WHERE uid=? AND created>?', (uid, now - 3600)).fetchone()[0] >= MAX_NEW_ADS_PER_HOUR:
+            if d.execute('SELECT COUNT(*) FROM market_ads WHERE uid=? AND created>?', (uid, now - 3600)).fetchone()[0] >= policy['max_new_hour']:
                 raise ValueError('Please slow down: %d new adverts per hour' % MAX_NEW_ADS_PER_HOUR)
             ad_id = uuid.uuid4().hex
             d.execute('INSERT INTO market_ads(id,uid,title,description,category,price,created,expires) VALUES(?,?,?,?,?,?,?,?)',
-                      (ad_id, uid, title, description, category, price, now, now + AD_LIFE))
+                      (ad_id, uid, title, description, category, price, now, now + policy['life_days']*86400))
+            if policy['review_required'] or any(re.search(r'\b'+re.escape(t)+r'\b',title+' '+description,re.I) for t in policy['prohibited_terms']):d.execute("UPDATE market_ads SET status='held' WHERE id=?",(ad_id,))
             return {'ok': True, 'id': ad_id}
         if action in ('remove_ad', 'renew_ad'):
             ad = d.execute('SELECT * FROM market_ads WHERE id=? AND uid=?', (b.get('id'), uid)).fetchone()

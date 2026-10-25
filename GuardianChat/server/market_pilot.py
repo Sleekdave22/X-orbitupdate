@@ -35,11 +35,14 @@ def init(server):
   CREATE TABLE IF NOT EXISTS market_pilot_keys(uid TEXT NOT NULL,key TEXT NOT NULL,fingerprint TEXT NOT NULL,listing TEXT NOT NULL,PRIMARY KEY(uid,key));
   CREATE TABLE IF NOT EXISTS market_seller_reports(seller TEXT NOT NULL,reporter TEXT NOT NULL,reason TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(seller,reporter));
   ''')
+  if 'delivery_regions' not in {r[1] for r in d.execute('PRAGMA table_info(market_listing_meta)')}:
+   d.execute("ALTER TABLE market_listing_meta ADD COLUMN delivery_regions TEXT NOT NULL DEFAULT '[]'")
   for ident,icon,name,subs,attrs in CATEGORIES:
    d.execute('INSERT OR IGNORE INTO market_categories(id,name,icon,subcategories,attributes) VALUES(?,?,?,?,?)',(ident,name,icon,json.dumps(subs),json.dumps(attrs)))
  __import__('market_search').init(server)
  __import__('market_connections').init(server)
  __import__('market_demo').init(server)
+ __import__('market_admin').init(server)
 
 def catalog(d,all=False):
  return [dict(r)|{'subcategories':json.loads(r['subcategories']),'attributes':json.loads(r['attributes'])} for r in d.execute('SELECT * FROM market_categories'+('' if all else ' WHERE enabled=1')+' ORDER BY rowid')]
@@ -69,6 +72,7 @@ def view(d,r,uid):
  out=ad_view(r,uid);m=d.execute('SELECT * FROM market_listing_meta WHERE id=?',(r['id'],)).fetchone()
  out.update(dict(m) if m else {'category_id':LEGACY.get(r['category'],'other'),'subcategory':'','amount_minor':None,'currency':'','condition':'','country':'','city':'','availability':'in_stock','attributes':'{}','delivery':'[]','state':{'active':'ACTIVE','held':'PENDING_REVIEW','removed':'REMOVED'}.get(r['status'],'PAUSED'),'revision':0,'updated':r['created'],'featured':0})
  out['attributes']=json.loads(out['attributes']);out['delivery']=json.loads(out['delivery'])
+ out['delivery_regions']=json.loads(out.get('delivery_regions','[]'))
  out['images']=[x['id'] for x in d.execute('SELECT id FROM market_images WHERE listing=? ORDER BY position',(r['id'],))]
  out['legacy']=m is None
  return out
@@ -105,6 +109,7 @@ def images_input(items):
 
 def notify(d,uid,event,listing,message):
  import account_notifications
+ if not __import__('market_admin').settings(d)['notifications_enabled']:return
  account_notifications.add(d,uid,'market','shop',message,{'listing':listing,'event':event})
  for saved in d.execute('SELECT uid FROM market_saves WHERE listing=? AND uid<>?',(listing,uid)):
   account_notifications.add(d,saved['uid'],'market','saved','Saved item changed: '+message,{'listing':listing,'event':'saved_changed'})
@@ -166,27 +171,34 @@ def post(server,uid,action,b):
    if not isinstance(attrs,dict) or set(attrs)-set(json.loads(cat['attributes'])):raise ValueError('Unsupported category attributes')
    attrs={k:text(v,100) for k,v in attrs.items()}
    if not isinstance(delivery,list) or not delivery or len(delivery)>3 or any(x not in ('pickup','local_delivery','shipping') for x in delivery):raise ValueError('Choose delivery or pickup options')
+   regions=b.get('delivery_regions',[country])
+   if not isinstance(regions,list) or len(regions)>30 or any(not isinstance(c,str) or c not in COUNTRIES for c in regions):raise ValueError('Use supported two-letter delivery country codes')
+   if 'shipping' in delivery and not regions:raise ValueError('Specify supported shipping countries')
    if availability not in ('in_stock','made_to_order','unavailable'):raise ValueError('Choose availability')
-   state=b.get('state','DRAFT')
+   state=b.get('state','DRAFT');config=__import__('market_admin').settings(d)
    if state not in ('DRAFT','ACTIVE','PAUSED'):raise ValueError('Choose draft, publish or paused')
    existing_count=d.execute('SELECT count(*) FROM market_images WHERE listing=?',(ident,)).fetchone()[0] if ident else 0
    if state=='ACTIVE' and not (photos if photos is not None else existing_count):raise ValueError('Add at least one product photograph to publish')
+   if state=='ACTIVE' and (config['review_required'] or any(re.search(r'\b'+re.escape(term)+r'\b',title+' '+description,re.I) for term in config['prohibited_terms'])):state='PENDING_REVIEW'
    if not ident:
     from market import MAX_ACTIVE_ADS,MAX_NEW_ADS_PER_HOUR
-    if d.execute("SELECT count(*) FROM market_ads WHERE uid=? AND status NOT IN ('removed','sold')",(uid,)).fetchone()[0]>=MAX_ACTIVE_ADS:raise ValueError('Shop listing limit reached')
-    if d.execute('SELECT count(*) FROM market_ads WHERE uid=? AND created>?',(uid,now-3600)).fetchone()[0]>=MAX_NEW_ADS_PER_HOUR:raise ValueError('Please slow down: five new listings per hour')
+    if d.execute("SELECT count(*) FROM market_ads WHERE uid=? AND status NOT IN ('removed','sold')",(uid,)).fetchone()[0]>=config['max_listings']:raise ValueError('Shop listing limit reached')
+    if d.execute('SELECT count(*) FROM market_ads WHERE uid=? AND created>?',(uid,now-3600)).fetchone()[0]>=config['max_new_hour']:raise ValueError('Please slow down before posting more listings')
     if d.execute("SELECT id FROM market_ads WHERE uid=? AND lower(title)=lower(?) AND status NOT IN ('removed','sold')",(uid,title)).fetchone():raise ValueError('A listing with that title already exists. Edit it instead.')
-    ident=uuid.uuid4().hex;d.execute('INSERT INTO market_ads(id,uid,title,description,category,price,created,expires,status) VALUES(?,?,?,?,?,?,?,?,?)',(ident,uid,title,description,cat['name'],str(b['price']),now,now+30*86400,state.lower()))
-   else:d.execute('UPDATE market_ads SET title=?,description=?,category=?,price=?,status=? WHERE id=?',(title,description,cat['name'],str(b['price']),state.lower(),ident))
+    ident=uuid.uuid4().hex;d.execute('INSERT INTO market_ads(id,uid,title,description,category,price,created,expires,status) VALUES(?,?,?,?,?,?,?,?,?)',(ident,uid,title,description,cat['name'],str(b['price']),now,now+config['life_days']*86400,'held' if state=='PENDING_REVIEW' else state.lower()))
+   else:d.execute('UPDATE market_ads SET title=?,description=?,category=?,price=?,status=? WHERE id=?',(title,description,cat['name'],str(b['price']),'held' if state=='PENDING_REVIEW' else state.lower(),ident))
+   if state=='ACTIVE':d.execute('UPDATE market_ads SET expires=max(expires,?) WHERE id=?',(now+config['life_days']*86400,ident))
    revision=old['revision']+1 if old else 1
    d.execute('INSERT INTO market_listing_meta(id,category_id,subcategory,amount_minor,currency,condition,country,city,attributes,delivery,availability,state,revision,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,subcategory=excluded.subcategory,amount_minor=excluded.amount_minor,currency=excluded.currency,condition=excluded.condition,country=excluded.country,city=excluded.city,attributes=excluded.attributes,delivery=excluded.delivery,availability=excluded.availability,state=excluded.state,revision=excluded.revision,updated=excluded.updated',(ident,category,sub,minor,currency,condition,country,city,json.dumps(attrs),json.dumps(delivery),availability,state,revision,now))
    if photos is not None:
     d.execute('DELETE FROM market_images WHERE listing=?',(ident,))
     for pos,data in enumerate(photos):d.execute('INSERT INTO market_images VALUES(?,?,?,?,?)',(uuid.uuid4().hex,ident,'image/jpeg',data,pos))
    d.execute('INSERT INTO market_seller_meta(uid,country,city) VALUES(?,?,?) ON CONFLICT(uid) DO UPDATE SET country=excluded.country,city=excluded.city',(uid,country,city))
+   d.execute('UPDATE market_listing_meta SET delivery_regions=? WHERE id=?',(json.dumps(regions),ident))
    d.execute('INSERT INTO market_listing_audit(listing,actor,action,created,revision) VALUES(?,?,?,?,?)',(ident,uid,'save:'+state,now,revision))
    if not old:d.execute('INSERT INTO market_pilot_keys VALUES(?,?,?,?)',(uid,key,fingerprint,ident))
    if state=='ACTIVE' and (not old or old['state']!='ACTIVE'):notify(d,uid,'published',ident,'Your listing is published: '+title)
+   elif state=='PENDING_REVIEW':notify(d,uid,'review',ident,'Listing waiting for moderation: '+title)
    elif old:notify(d,uid,'edited',ident,'Listing updated: '+title)
    return {'ok':True,'id':ident,'revision':revision}
  if action=='listing_state':
@@ -197,10 +209,13 @@ def post(server,uid,action,b):
    if state not in transitions.get(v['state'],set()):raise ValueError('This state transition is not allowed')
    if state=='REMOVED' and b.get('confirmed') is not True:raise ValueError('Confirm removal')
    if state=='ACTIVE' and not v['legacy'] and not v['images']:raise ValueError('Add a product photograph first')
+   config=__import__('market_admin').settings(d)
+   if state=='ACTIVE' and (config['review_required'] or any(re.search(r'\b'+re.escape(term)+r'\b',v['title']+' '+v['description'],re.I) for term in config['prohibited_terms'])):state='PENDING_REVIEW'
    if v['legacy']:
     d.execute('INSERT INTO market_listing_meta(id,category_id,state,revision,updated) VALUES(?,?,?,?,?)',(v['id'],v['category_id'],state,1,now))
    else:d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',(state,now,v['id']))
-   d.execute('UPDATE market_ads SET status=? WHERE id=?',(state.lower(),v['id']));d.execute('INSERT INTO market_listing_audit(listing,actor,action,created,revision) VALUES(?,?,?,?,?)',(v['id'],uid,state,now,v['revision']+1))
+   d.execute('UPDATE market_ads SET status=? WHERE id=?',('held' if state=='PENDING_REVIEW' else state.lower(),v['id']));d.execute('INSERT INTO market_listing_audit(listing,actor,action,created,revision) VALUES(?,?,?,?,?)',(v['id'],uid,state,now,v['revision']+1))
+   if state=='ACTIVE':d.execute('UPDATE market_ads SET expires=max(expires,?) WHERE id=?',(now+config['life_days']*86400,v['id']))
    notify(d,uid,state.lower(),v['id'],'Listing '+state.lower()+': '+v['title']);return {'ok':True}
  if action=='report_seller':
   with server.db() as d:

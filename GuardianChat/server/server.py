@@ -98,6 +98,8 @@ class ChatServer(ThreadingHTTPServer):
             with self.db() as db:
                 db.execute('BEGIN IMMEDIATE');__import__('market_connections').expire(db)
         except Exception as error:print('Market reservation maintenance deferred: '+type(error).__name__,flush=True)
+        try:__import__('market_connections').dispatch(self)
+        except Exception as error:print('Market notification dispatch deferred: '+type(error).__name__,flush=True)
         try:__import__('result_reviews').dispatch(self)
         except Exception as error:print('Private result review unavailable: '+type(error).__name__,flush=True)
     def push_call(self,call,event):

@@ -31,6 +31,7 @@ class MarketPilotTest(unittest.TestCase):
   with self.assertRaises(urllib.error.HTTPError):self.save(a,edit)
   self.call('/market/listing_state',{'id':i,'revision':2,'state':'PAUSED'},a['token'])
   with self.assertRaises(urllib.error.HTTPError):self.listing(b,i)
+  with self.server.db() as d:d.execute('UPDATE market_ads SET expires=1 WHERE id=?',(i,))
   self.call('/market/listing_state',{'id':i,'revision':3,'state':'ACTIVE'},a['token']);self.assertEqual(self.listing(b,i)['state'],'ACTIVE')
   self.call('/market/listing_state',{'id':i,'revision':4,'state':'SOLD'},a['token']);self.assertEqual(self.listing(b,i)['state'],'SOLD')
   self.assertEqual(self.call('/market/listings',token=b['token'])['listings'],[])

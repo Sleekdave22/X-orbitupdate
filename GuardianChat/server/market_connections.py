@@ -12,9 +12,11 @@ def init(server):
  CREATE TABLE IF NOT EXISTS market_reservations(listing TEXT PRIMARY KEY,offer TEXT UNIQUE NOT NULL,buyer TEXT NOT NULL,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS market_operations(uid TEXT NOT NULL,key TEXT NOT NULL,fingerprint TEXT NOT NULL,result TEXT NOT NULL,PRIMARY KEY(uid,key));
  CREATE TABLE IF NOT EXISTS market_inquiries(buyer TEXT NOT NULL,seller TEXT NOT NULL,listing TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(buyer,listing));
+ CREATE TABLE IF NOT EXISTS market_push_delivery(id INTEGER PRIMARY KEY,attempts INTEGER NOT NULL DEFAULT 0,next_attempt INTEGER NOT NULL DEFAULT 0,delivered INTEGER NOT NULL DEFAULT 0);
  ''')
 
-def emit(d,uid,section,message,target):activity.add(d,uid,'market',section,message,target)
+def emit(d,uid,section,message,target):
+ if __import__('market_admin').settings(d)['notifications_enabled']:activity.add(d,uid,'market',section,message,target)
 def permitted(d,a,b):
  import social
  if social.blocked(d,a,b):raise ValueError('Account interaction unavailable')
@@ -66,6 +68,10 @@ def get(server,uid,path,q):
    before=max(0,int(arg('before','0')));rows=d.execute("SELECT * FROM account_activity WHERE uid=? AND category='market' AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",(uid,before,before)).fetchall()
    count=d.execute("SELECT count(*) FROM account_activity WHERE uid=? AND category='market' AND seen=0",(uid,)).fetchone()[0]
    return {'notifications':[dict(r)|{'target':json.loads(r['target'])} for r in rows[:50]],'more':len(rows)>50,'unread':count}
+  if path=='/market/activity_item':
+   r=d.execute("SELECT * FROM account_activity WHERE uid=? AND category='market' AND id=?",(uid,int(arg('id','0')))).fetchone()
+   if not r:raise ValueError('Market notification unavailable')
+   return {'notification':dict(r)|{'target':json.loads(r['target'])}}
  raise ValueError('Unknown Market connection route')
 
 def post(server,uid,action,b):
@@ -137,3 +143,27 @@ def post(server,uid,action,b):
    d.execute('UPDATE market_offers SET state=?,amount_minor=?,turn=?,revision=revision+1 WHERE id=?',(state,minor,target,ident));event=state.lower()
   d.execute('INSERT INTO market_offer_history(offer,actor,event,amount_minor,created) VALUES(?,?,?,?,?)',(ident,uid,event,minor,now));emit(d,target,'offers','Offer '+event.replace('_',' ')+': '+v['title'],{'offer':ident,'listing':v['id'],'event':event})
   result={'ok':True,'id':ident};d.execute('INSERT INTO market_operations VALUES(?,?,?,?)',(uid,key,fingerprint,json.dumps(result)));return result
+
+def dispatch(server):
+ """Session-scoped data-only push. Native fetches the authorized notice before display."""
+ if not server.push.enabled or getattr(server,'market_push_busy',False):return
+ with server.db() as d:
+  if not __import__('market_admin').settings(d)['notifications_enabled']:return
+  now=int(time.time());rows=[dict(r) for r in d.execute("SELECT a.* FROM account_activity a LEFT JOIN market_push_delivery p ON p.id=a.id WHERE a.category='market' AND a.seen=0 AND a.created>? AND coalesce(p.delivered,0)=0 AND coalesce(p.attempts,0)<6 AND coalesce(p.next_attempt,0)<=? ORDER BY a.id LIMIT 20",(now-86400,now))]
+ if not rows:return
+ import threading
+ server.market_push_busy=True
+ def deliver():
+  try:
+   for notice in rows:
+    with server.db() as d:
+     active=d.execute("SELECT seen FROM account_activity WHERE uid=? AND id=? AND category='market'",(notice['uid'],notice['id'])).fetchone()
+     if not active or active['seen']:continue
+     devices=[r['token'] for r in d.execute('SELECT p.token FROM push_devices p JOIN sessions s ON s.token_hash=p.session_hash AND s.user_id=p.user_id WHERE p.user_id=?',(notice['uid'],))]
+    accepted=bool(devices)
+    for token in devices:
+     try:server.push.send(token,{'event':'market_notice','notice_id':str(notice['id']),'recipient':notice['uid'],'expires_at':str(notice['created']+86400)})
+     except Exception:accepted=False
+    with server.db() as d:d.execute('INSERT INTO market_push_delivery(id,attempts,next_attempt,delivered) VALUES(?,1,?,?) ON CONFLICT(id) DO UPDATE SET attempts=attempts+1,next_attempt=excluded.next_attempt,delivered=excluded.delivered',(notice['id'],int(time.time())+300,int(accepted)))
+  finally:server.market_push_busy=False
+ threading.Thread(target=deliver,daemon=True).start()
