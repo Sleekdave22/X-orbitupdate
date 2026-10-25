@@ -57,6 +57,8 @@ def award(d,kind,r):
   d.execute('UPDATE gb_ratings SET rating=?,played=played+1,activity=activity+1 WHERE uid=? AND game=?',(new[u],u,game))
   d.execute('INSERT INTO gb_rank_history(uid,game,kind,source,rating_before,rating_after,policy,created) VALUES(?,?,?,?,?,?,?,?)',(u,game,kind,r['id'],old[u]['rating'],new[u],p['id'],int(time.time())))
  d.execute('INSERT INTO gb_rank_awards VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',(kind,r['id'],game,actual['a'],actual['b'],actual['score_a'],actual['score_b'],p['id'],old[actual['a']]['rating'],old[actual['b']]['rating'],new[actual['a']],new[actual['b']],int(time.time())))
+ # Recognition references these verified awards; it never publishes a Vibe automatically.
+ if d.execute("SELECT 1 FROM sqlite_master WHERE name='vibe_rank_milestones'").fetchone():__import__('vibe_sources').recognize(d,game)
  return {'old':old,'new':new,'policy':p['id']}
 def publish(d,uid,b):
  import gamebox_core
