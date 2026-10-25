@@ -1,4 +1,4 @@
-# Vibe viewer and transparent-icon update — version 29
+# Vibe viewer and transparent-icon update — versions 29/30
 
 25 October 2026. Main project: `Sleekdave22/X-orbitupdate`, branch
 `feature/market-pilot-foundation`. Original `Sleekdave22/X-Orbit` is unchanged.
@@ -82,4 +82,18 @@ fallback. Original PNGs were preserved. The final extraction prompt was:
 
 ## Deployment
 
-Pending final frozen-package deployment and S21 installation verification.
+Version 29 (`c50c823889a8d138199007a4cb65257832363870`) was deployed to both
+8766 and 8768 from a frozen release, preserving shared users/contacts/messages and
+passing database integrity checks. Installed with `install -r`; package version,
+saved @s21 session and authenticated Vibe/Market/match APIs were verified. Browser
+automation recovered: the compact feed, transparent Play icon and full-screen
+viewer/reply controls were inspected without sending live test messages.
+
+During acceptance the Wi-Fi network changed. The Mac moved to `172.20.10.4`, and
+the S21 retained the old `192.168.1.171` address. Version 30 adds that exact new IP
+to the existing local-CA domain allowlist and updates the setup default. The local
+leaf certificate was renewed under the same CA, retaining localhost, loopback and
+the earlier LAN SANs. TLS/hostname verification and cleartext restrictions remain
+enabled; private keys and certificates are not added to Git. A final CSS-specificity
+correction removes the inherited rounded dialog frame and rounds the reply send
+button correctly. Final Wi-Fi deployment and saved-address migration are pending.
