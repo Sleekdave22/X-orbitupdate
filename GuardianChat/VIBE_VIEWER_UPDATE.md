@@ -96,4 +96,19 @@ leaf certificate was renewed under the same CA, retaining localhost, loopback an
 the earlier LAN SANs. TLS/hostname verification and cleartext restrictions remain
 enabled; private keys and certificates are not added to Git. A final CSS-specificity
 correction removes the inherited rounded dialog frame and rounds the reply send
-button correctly. Final Wi-Fi deployment and saved-address migration are pending.
+button correctly.
+
+Version 30 (`d98469b3847f45a0b6ca7760b843e89cd4f0ae62`) built successfully and was
+installed over Wi-Fi with `install -r`. Both browser addresses now serve that frozen
+release and passed byte checks/database integrity verification. The new HTTPS IP
+was authenticated as @s21 using the saved session before migrating the phone's
+address. All other saved preferences were checked unchanged; the account's ordinary
+sent-attachment cache was moved to its new address scope after confirming the same
+backend identity. No protected/view-once cache was created or copied. A private
+on-device preference backup remains available. No credentials were printed or added
+to Git. The local deployment receipt records successful migration and cache retention.
+
+The S21 subsequently disconnected from debugging, so an additional package/profile
+reread and physical keyboard/private-viewer acceptance remain unverified. Browser
+inspection confirms the compact layout; physical acceptance is not inferred from
+installation success. The original X-Orbit repository remains unchanged.
