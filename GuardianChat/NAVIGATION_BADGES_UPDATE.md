@@ -20,4 +20,4 @@ Counters use the existing red/pink top-right badge style, hide at zero, and disp
 
 ## Deployment
 
-Prepared for the same shared backend and existing S21 account. Version 32 was not deployed; this release supersedes that pending installer. Live browser deployment and phone installation await the already requested stop of the two older local browser servers. Physical phone badge verification remains pending installation.
+Deployed 26 October 2026 from implementation commit `9c7e1a386b1ec22928b5e2f806b674901f67e163`. Both `https://localhost:8766/` and `https://localhost:8768/` serve the frozen tested source. Database integrity and retained user/contact/message counts were verified after the additive migration. Version 33 is installed on the S21; authenticated API checks confirm @s21 and its saved server remain intact. The browser retained Mainfirst and visibly showed Chat 1 and Vibe 2; Calls correctly had no badge at zero. No live messages were sent or calls generated for this verification. Physical phone badge interactions remain a manual verification item. Version 32 was superseded before deployment.
