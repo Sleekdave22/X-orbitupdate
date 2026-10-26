@@ -304,6 +304,6 @@ body:has(#gamingBrand)>header>div:not(#topGamingProfile){flex:1;min-width:0}
 .arena-account-row #gamingTab{margin:0!important}
 .arena-account-row #marketTab{display:inline-flex;align-items:center;gap:7px;width:auto;min-width:0;min-height:42px;margin:0;padding:8px 12px;font-size:12px;background:var(--card2)!important;color:var(--ink)!important;border:0!important;border-radius:14px}
 #marketTab svg{flex-shrink:0}
-/* Plain wallpaper: the same purple-to-navy (dark) and violet-to-cyan (light) colours as the doodle wallpaper, without the sketches. Delete this block to bring the sketches back. */
-html{--orbit-wallpaper:linear-gradient(180deg,#4b018e 0%,#32017f 25%,#0a1366 50%,#00133e 75%,#01081f 100%);--orbit-settings-wallpaper:linear-gradient(180deg,#440195 0%,#270286 25%,#041274 50%,#010937 75%,#01000a 100%)}
-html[data-theme=bright]{--orbit-wallpaper:linear-gradient(180deg,#df75fc 0%,#9761fb 25%,#3967fc 50%,#1594fc 75%,#22bffc 100%);--orbit-settings-wallpaper:linear-gradient(180deg,#da73fb 0%,#9663fc 25%,#3a79fc 50%,#1fb0fd 75%,#25defd 100%)}
+/* Faint sketches: the doodle wallpaper with its sketches turned down to 20%. Delete this block to restore full-strength sketches, or see the style/plain-wallpaper branch for none. */
+html{--orbit-wallpaper:url('/branding/soft-wallpaper.png?v=1');--orbit-settings-wallpaper:url('/branding/soft-settings-dark.png?v=1')}
+html[data-theme=bright]{--orbit-wallpaper:url('/branding/soft-wallpaper-v2.png?v=1');--orbit-settings-wallpaper:url('/branding/soft-settings-light.png?v=1')}

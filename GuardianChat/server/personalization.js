@@ -14,7 +14,7 @@
   const scene=document.getElementById('paletteScene');if(!scene||!p)return;
   scene.dataset.mode=previewBright?'bright':'dark';
   scene.style.setProperty('--preview-tint',wallpaperTint(p,previewBright));
-  scene.style.setProperty('--preview-art',previewBright?'linear-gradient(180deg,#df75fc,#9761fb 25%,#3967fc 50%,#1594fc 75%,#22bffc)':'linear-gradient(180deg,#4b018e,#32017f 25%,#0a1366 50%,#00133e 75%,#01081f)');
+  scene.style.setProperty('--preview-art','url("/branding/'+(previewBright?'soft-wallpaper-v2.png':'soft-wallpaper.png')+'?v=1")');
   document.getElementById('palettePreviewHeading').style.color=p[previewBright?'headingLight':'headingDark']||fallback[previewBright?'headingLight':'headingDark'];
   for(const [id,first] of [['sentPreview',true],['receivedPreview',false]]){const e=document.getElementById(id);e.style.backgroundColor=first?p.bubble:p.received;e.style.color=first?p.ink:p.receivedInk}
   for(const [id,bright] of [['paletteDark',false],['paletteLight',true]])document.getElementById(id).setAttribute('aria-pressed',String(previewBright===bright));
