@@ -22,6 +22,7 @@ async function privateResultRoom(id){
   state.textContent=done?'Result: '+r.state.replaceAll('_',' '):review.submitted?'Waiting for review':'Result: '+r.state.replaceAll('_',' ');
   messages.hidden=done;
   if(done){
+   if(['verified','confirmed'].includes(r.state)&&typeof offerGamingVibe==='function'){vibePromptChecked=false;offerGamingVibe()}
    if(r.final_score)area.append(node('strong',r.final_score[0]+' – '+r.final_score[1],'score'));
    area.append(node('p',r.final_score?'Final result saved. Relevant rankings, standings and match history have updated.':'This match is closed; no new evidence can be submitted.'),
     button('View standings / rankings',async()=>{resultCleanup?.();tab=r.kind==='fixture'?'table':'open';await load()}));return;

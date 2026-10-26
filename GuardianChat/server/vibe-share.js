@@ -13,7 +13,7 @@ window.OrbitVibeShare={async show(api,source,{prompt=false}={}){
 }};
 window.OrbitVibeReturn={
  save(account,item,visibility){sessionStorage.setItem('orbit-vibe-return',JSON.stringify({uid:account.id,origin:location.origin,item,visibility,created:Date.now()}))},
- get(account){try{const r=JSON.parse(sessionStorage.getItem('orbit-vibe-return')||'null');return r&&r.uid===account.id&&r.origin===location.origin&&Date.now()-r.created<86400000&&/^[a-f0-9]{32}$/.test(r.item)?r:null}catch{return null}},
+ get(account){try{const r=JSON.parse(sessionStorage.getItem('orbit-vibe-return')||'null');return r&&r.uid===account.id&&r.origin===location.origin&&Date.now()-r.created>=0&&Date.now()-r.created<86400000&&['public','private'].includes(r.visibility)&&/^[a-f0-9]{32}$/.test(r.item)?r:null}catch{return null}},
  url(account){const r=this.get(account);return r?'/vibe.html?item='+r.item+'&visibility='+r.visibility:'/vibe.html'},
  clear(){sessionStorage.removeItem('orbit-vibe-return')}
 };

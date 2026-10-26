@@ -45,7 +45,10 @@ def resolve(d,viewer,owner,kind,source,game='',publishing=False,visibility='priv
   final=d.execute("SELECT * FROM fixtures WHERE league=? AND stage='final' AND state='confirmed' ORDER BY round DESC LIMIT 1",(source,)).fetchone()
   if not l or l['game']!=game or l['state']!='finished' or l['champion']!=owner or not final or final['score_a']==final['score_b'] or (final['a'] if final['score_a']>final['score_b'] else final['b'])!=owner:raise ValueError('No verified championship victory is available')
   if d.execute("SELECT 1 FROM fixtures WHERE league=? AND state IN ('disputed','review','pending')",(source,)).fetchone():raise ValueError('Competition review is still open')
-  result.update(title='X-ORBIT CHAMPION',detail=l['name']+' · '+l['format'].title()+' Winner',status='Verified trophy',version=str((final['id'],final['score_a'],final['score_b'])),achievement_url='/gaming.html?league='+source)
+  registered=d.execute('SELECT game_id FROM league_members WHERE league=? AND uid=?',(source,owner)).fetchone()
+  if not registered or not registered[0]:raise ValueError('The competition identity record is unavailable')
+  result['gaming_id']=registered[0]
+  result.update(title='X-ORBIT CHAMPION',detail=l['name']+' · '+l['format'].title()+' Winner',status='Verified trophy',version=str((final['id'],final['score_a'],final['score_b'])),achievement_url='/gaming.html?league='+source+'&champion=1')
  elif kind=='sponsored':
   import sponsored_leagues
   l=sponsored_leagues.get_league(d,source)
@@ -53,12 +56,20 @@ def resolve(d,viewer,owner,kind,source,game='',publishing=False,visibility='priv
   if l['game']!=game or l['state'] not in ('COMPLETED','ARCHIVED') or not l['final_snapshot'] or not standing or standing['position']!=1 or standing['played']<1:raise ValueError('No finalized league victory is available')
   results=d.execute('SELECT r.*,m.state,m.score_a AS actual_a,m.score_b AS actual_b FROM sl_results r JOIN gb_matches m ON m.id=r.match WHERE r.league=?',(source,)).fetchall()
   if not results or any(r['state']!='verified' or r['score_a']!=r['actual_a'] or r['score_b']!=r['actual_b'] for r in results) or d.execute("SELECT 1 FROM sl_appeals a JOIN sl_results r ON r.match=a.match WHERE r.league=? AND a.state='pending'",(source,)).fetchone():raise ValueError('League results are under review')
+  registered=d.execute('SELECT game_id FROM sl_registrations WHERE league=? AND uid=?',(source,owner)).fetchone()
+  if not registered:raise ValueError('The competition identity record is unavailable')
+  result['gaming_id']=registered[0]
   result.update(title='X-ORBIT CHAMPION',detail=l['name']+' · League Winner',status='Verified trophy',version=hashlib.sha256(json.dumps([dict(r) for r in results],sort_keys=True).encode()).hexdigest(),achievement_url='/gaming.html?vibe_sponsored='+source)
  else:
   r=d.execute('SELECT v.*,h.kind,h.source,h.rating_after FROM vibe_rank_milestones v JOIN gb_rank_history h ON h.id=v.history WHERE v.id=? AND v.uid=? AND v.game=?',(source,owner,game)).fetchone()
   a=d.execute('SELECT a.*,m.state,m.score_a AS actual_a,m.score_b AS actual_b FROM gb_rank_awards a JOIN gb_matches m ON m.id=a.id WHERE a.kind=? AND a.id=?',(r['kind'],r['source'])).fetchone() if r else None
   if not a or a['state']!='verified' or a['score_a']!=a['actual_a'] or a['score_b']!=a['actual_b']:raise ValueError('Milestone result is unavailable or corrected')
-  result.update(title='Number 1' if r['threshold']==1 else 'Top '+str(r['threshold']),detail='Verified global ranking milestone',status='Ranking achievement',version=str(r['history']))
+  match=d.execute('SELECT * FROM gb_matches WHERE id=?',(r['source'],)).fetchone();result['gaming_id']=match['gid_a'] if match['a']==owner else match['gid_b']
+  invalid=d.execute("""SELECT 1 FROM gb_rank_history h JOIN gb_rank_awards a ON a.kind=h.kind AND a.id=h.source
+   JOIN gb_matches m ON m.id=h.source WHERE h.game=? AND h.id<=?
+   AND (m.state!='verified' OR m.score_a!=a.score_a OR m.score_b!=a.score_b) LIMIT 1""",(game,r['history'])).fetchone()
+  if invalid:raise ValueError('Ranking history is under correction')
+  result.update(title='Number 1' if r['threshold']==1 else 'Top '+str(r['threshold']),detail='Verified global ranking milestone',status='Ranking achievement',version=str(r['history']),achievement_url='/gaming.html?vibe_rank_profile='+owner+'&game='+game)
  return result
 
 def linked(d,viewer,item):
@@ -81,16 +92,20 @@ def card(d,source):
   if r:
    with Image.open(io.BytesIO(r[0])) as picture:im.paste(ImageOps.contain(picture.convert('RGB'),(656,420)),(32,32))
    y=480
- for text,size,color in [(source.get('handle',''),26,'#22d3ee'),(source['title'],36,'#f4f5fa'),(source.get('price',''),30,'#34d399'),(source.get('name',''),28,'#f4f5fa'),((__import__('gaming').GAMES.get(source.get('game'),'')+' ID: '+source['gaming_id']) if source.get('gaming_id') else '',25,'#adb4c5'),(source.get('detail',''),24,'#f4f5fa'),(source.get('status',''),22,'#adb4c5')]:
-  for line in textwrap.wrap(str(text),width=32 if size>=30 else 44):
+ for text,size,color in [(source.get('handle',''),26,'#22d3ee'),(source['title'],36,'#f4f5fa'),(source.get('price',''),30,'#34d399'),(source.get('name',''),28,'#f4f5fa'),((__import__('gaming').GAMES.get(source.get('game'),'')+' ID: '+source['gaming_id']) if source.get('gaming_id') else '',25,'#adb4c5'),(source.get('detail',''),24,'#f4f5fa')]:
+  lines=textwrap.wrap(str(text),width=32 if size>=30 else 44)
+  for index,line in enumerate(lines):
+   if y+size>885:break
+   if y+2*(size+10)>885 and index<len(lines)-1:line=line.rstrip()+'…'
    draw.text((32,y),line,font=font(size),fill=color);y+=size+10
-   if y>910:break
+ # Availability is never pushed off-screen by a long product description.
+ draw.rectangle((0,912,720,960),fill='#131932');draw.text((32,922),source.get('status',''),font=font(22),fill='#f4f5fa')
  out=io.BytesIO();im.save(out,'PNG');return out.getvalue()
 
 def publish(d,uid,b):
  import vibes,social
  kind=b.get('kind');source=b.get('source');game=b.get('game','');visibility=b.get('visibility');client=b.get('client_id');audience=b.get('audience',[])
- if kind not in KINDS or not isinstance(source,str) or not source or not isinstance(game,str) or visibility not in ('public','private') or not isinstance(client,str) or not 8<=len(client)<=100:raise ValueError('Choose a source and Public or Private Vibe')
+ if kind not in KINDS or not isinstance(source,str) or not 1<=len(source)<=128 or not isinstance(game,str) or len(game)>80 or kind=='market' and game!='' or visibility not in ('public','private') or not isinstance(client,str) or not 8<=len(client)<=100:raise ValueError('Choose a source and Public or Private Vibe')
  recipients=vibes.recipients(d,uid,visibility,audience)
  payload=json.dumps([kind,source,game,visibility,recipients],separators=(',',':'));digest=hashlib.sha256(payload.encode()).hexdigest()
  prior=d.execute('SELECT * FROM vibe_link_keys WHERE uid=? AND client=?',(uid,client)).fetchone()
@@ -117,7 +132,7 @@ def recognize(d,game):
  """Only invoked by the verified ranking award transaction, never ordinary UI wins."""
  import rankings
  thresholds=json.loads(d.execute('SELECT thresholds FROM vibe_milestone_policy WHERE id=1').fetchone()[0]);p=rankings.policy(d)['config']['placements'];position=0
- for r in d.execute("SELECT r.* FROM gb_ratings r JOIN gb_identity_meta m ON m.uid=r.uid AND m.game=r.game WHERE r.game=? AND m.state='active' ORDER BY r.rating DESC,r.played DESC,r.uid",(game,)).fetchall():
+ for r in d.execute("SELECT i.uid FROM gb_game_ids i JOIN gb_identity_meta m ON m.uid=i.uid AND m.game=i.game LEFT JOIN gb_ratings r ON r.uid=i.uid AND r.game=i.game WHERE i.game=? AND m.state='active' ORDER BY COALESCE(r.rating,1500) DESC,COALESCE(r.played,0) DESC,i.uid",(game,)).fetchall():
   if rankings.placements(d,r['uid'],game)<p:continue
   position+=1
   h=d.execute('SELECT id FROM gb_rank_history WHERE uid=? AND game=? ORDER BY id DESC LIMIT 1',(r['uid'],game)).fetchone()

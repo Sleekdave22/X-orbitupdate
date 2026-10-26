@@ -73,6 +73,7 @@ class UnifiedVibeTest(unittest.TestCase):
   a=self.user('Champion');b=self.user('Runner');self.identity(a);self.identity(b)
   with self.server.db() as d:d.execute('INSERT INTO game_admin VALUES(?)',(a['id'],))
   lid=self.call('/gaming/create',{'game':'efootball','name':'Vibe Championship'},a['token'])['id'];fid=uuid.uuid4().hex
+  for u in (a,b):self.call('/gaming/join',{'league':lid},u['token'])
   with self.server.db() as d:
    d.execute("INSERT INTO fixtures(id,league,round,a,b,state,score_a,score_b,stage) VALUES(?,?,9,?,?,'disputed',3,1,'final')",(fid,lid,a['id'],b['id']))
   self.assertEqual(self.call('/vibe/prompts',token=a['token'])['prompts'],[])

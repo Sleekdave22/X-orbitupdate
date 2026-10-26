@@ -122,7 +122,7 @@ function refreshChampion(){api("/gaming/summary").then(d=>{const c=el("gamingCha
 el("gamingTab").onclick=()=>location.assign("/gaming.html");
 async function openMarketSellerChat(){
  const target=new URLSearchParams(location.search).get('chat');if(!target||!account)return;
- const owner=account.id;history.replaceState(null,'',location.pathname);
+ const owner=account.id;const originQuery=new URLSearchParams(location.search);originQuery.delete('chat');history.replaceState(null,'',location.pathname+(originQuery.size?'?'+originQuery.toString():''));
  try{const data=await api('/users');if(account?.id!==owner||activeScreen!=='contacts')return;const seller=data.users.find(u=>u.id===target);if(seller)openChat(seller,true);else error('This seller conversation is unavailable.')}catch(e){error(e.message)}
 }
 el('marketTab').onclick=()=>location.assign('/market.html');
