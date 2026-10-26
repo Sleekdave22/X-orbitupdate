@@ -152,6 +152,29 @@ Private previews remain concealed outside GuardianLab protection. Existing
 authorized result-correction/recalculation procedures are not replaced by this
 sharing feature; Vibe reflects original record state and withholds invalid claims.
 
+### Deployment receipt — 26 October 2026
+
+- Implementation commit `f77d8c95fac6259ce9b97b527c9a1da35012129f` is pushed to
+  `Sleekdave22/X-orbitupdate`, branch `feature/unified-vibe-sharing`.
+- Both `https://localhost:8766/` and `https://localhost:8768/` serve the same
+  frozen, tested version 31 interface and shared database. Source asset responses
+  were verified byte-for-byte after restart; database integrity and preservation
+  of existing user/contact/message counts passed. A consistent database backup
+  was completed before switching servers; no live call or stream was interrupted.
+- Android package `com.guardianlab.chat`, version `0.31-unified-vibe` (code 31),
+  installed successfully on the S21. Its saved session was checked against the
+  authenticated Vibe, Market, game-match and sharing-prompt endpoints. **@s21 is
+  retained.** The current LAN address is `https://192.168.1.171:8766/`; existing
+  certificate and hostname verification remain enabled. Other preferences and
+  ordinary sent-attachment cache were preserved during the Wi-Fi address update.
+- The live browser account still loads normally. Its refreshed Vibe screen was
+  inspected with the original wallpaper, navigation, profile portrait and new
+  settings icon. Its older posts have expired, so no upload-count badge is shown
+  for an empty group; the four-post badge/latest-preview case was verified with
+  isolated synthetic data instead of publishing test content into live accounts.
+- Final physical visual acceptance is requested separately; package/API checks
+  are not described as a completed user interaction test.
+
 ## Database/API changes and manual checks
 
 Five additive tables: `vibe_links`, `vibe_link_keys`, `vibe_prompt_dismissals`,
