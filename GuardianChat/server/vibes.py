@@ -14,7 +14,9 @@ def init(server):
  CREATE INDEX IF NOT EXISTS vibe_active ON vibe_items(expires,uid,visibility);
  CREATE TABLE IF NOT EXISTS vibe_replies(message_id INTEGER PRIMARY KEY,item TEXT NOT NULL,visibility TEXT NOT NULL,sender TEXT NOT NULL,client_id TEXT NOT NULL,UNIQUE(sender,client_id));
  ''')
- with server.db() as d:__import__('vibe_sources').schema(d)
+ with server.db() as d:
+  __import__('vibe_sources').schema(d)
+  __import__('vibe_privacy').schema(d)
 
 def recipients(d,uid,visibility,audience):
  if not isinstance(audience,list) or len(audience)>200 or any(not isinstance(x,str) for x in audience):raise ValueError('Choose valid private recipients')
@@ -22,7 +24,7 @@ def recipients(d,uid,visibility,audience):
  if not audience:raise ValueError('Choose at least one existing contact for this Private Vibe')
  import social
  for target in set(audience):
-  if not d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone() or social.blocked(d,uid,target):raise PermissionError('Private Vibe recipients must be your available contacts')
+  if not d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone() or social.blocked(d,uid,target) or not __import__('vibe_privacy').permitted(d,target,uid,'private'):raise PermissionError('Private Vibe recipients must be your available, permitted contacts')
  return sorted(set(audience))
 
 def preferences(d,uid):
@@ -33,7 +35,7 @@ def allowed(d,uid,item,now=None):
  import social
  if item is None or item['expires']<=(int(time.time()) if now is None else now) or item['media'] is None:return False
  if item['uid']==uid:return True
- if social.blocked(d,uid,item['uid']):return False
+ if social.blocked(d,uid,item['uid']) or not __import__('vibe_privacy').permitted(d,uid,item['uid'],item['visibility']):return False
  return item['visibility']=='public' or bool(d.execute('SELECT 1 FROM vibe_audience a JOIN contacts c ON c.owner=? AND c.peer=a.uid WHERE a.item=? AND a.uid=?',(item['uid'],item['id'],uid)).fetchone())
 
 def item(d,uid,ident):
@@ -42,6 +44,7 @@ def item(d,uid,ident):
  return r
 
 def get(server,uid,action,q):
+ if action=='privacy':return __import__('vibe_privacy').get(server,uid)
  with server.db() as d:
   if action=='prompts':return {'prompts':__import__('vibe_sources').prompts(d,uid)}
   if action=='achievements':
@@ -63,7 +66,7 @@ def get(server,uid,action,q):
    if visibility not in ('public','private'):raise ValueError('Choose Public or Private Vibe')
    groups={}
    for r in d.execute('SELECT i.id,i.uid,i.visibility,i.mime,i.caption,i.created,i.expires,1 AS media,u.name,u.nickname,u.avatar,u.avatar_mime FROM vibe_items i JOIN users u ON u.id=i.uid WHERE i.visibility=? AND i.expires>? AND i.media IS NOT NULL ORDER BY i.created,i.rowid',(visibility,int(time.time()))):
-    if not allowed(d,uid,r):continue
+    if not allowed(d,uid,r) or __import__('vibe_privacy').muted(d,uid,r['uid']):continue
     contact=bool(d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,r['uid'])).fetchone())
     following=bool(d.execute("SELECT 1 FROM social_follows WHERE follower=? AND target=? AND state='accepted'",(uid,r['uid'])).fetchone())
     group=groups.setdefault(r['uid'],{'uid':r['uid'],'name':r['name'],'nickname':r['nickname'],'contact':contact,'following':following,'avatar':r['avatar'] if contact or r['uid']==uid else None,'avatar_mime':r['avatar_mime'] if contact or r['uid']==uid else None,'items':[]})
@@ -71,7 +74,8 @@ def get(server,uid,action,q):
     source=__import__('vibe_sources').linked(d,uid,r)
     group['items'].append({'source_version':hashlib.sha256(json.dumps(source,sort_keys=True).encode()).hexdigest() if source else None,'id':r['id'],'created':r['created'],'expires':r['expires'],'caption':r['caption'] if visibility=='public' or r['uid']==uid else '', 'mime':r['mime'],'viewed':bool(v),'views':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(r['id'],)).fetchone()[0] if r['uid']==uid else None})
    own=d.execute('SELECT id,name,nickname,avatar,avatar_mime FROM users WHERE id=?',(uid,)).fetchone()
-   return {'groups':list(groups.values()),'account':dict(own),'preferences':preferences(d,uid),'emoji':EMOJI}
+   ordered=sorted(groups.values(),key=lambda g:(all(i['viewed'] for i in g['items']),-max(i['created'] for i in g['items']),g['uid']))
+   return {'groups':ordered,'account':dict(own),'preferences':preferences(d,uid),'emoji':EMOJI}
   if action=='preview':
    r=item(d,uid,q.get('id',[''])[0])
    # Private media stays in the protected viewer, including thumbnails.
@@ -100,7 +104,9 @@ def media(server,uid,ident,protected=False):
   r=item(d,uid,ident)
   if r['visibility']=='private' and not protected:raise PermissionError('Open Private Vibe in the GuardianLab-protected Android viewer')
   source=__import__('vibe_sources').linked(d,uid,r);raw=__import__('vibe_sources').card(d,source) if source else r['media']
-  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship']}
+  queue=[x['id'] for x in d.execute('SELECT id,uid,visibility,expires,1 AS media FROM vibe_items WHERE uid=? AND visibility=? AND expires>? AND media IS NOT NULL ORDER BY created,rowid',(r['uid'],r['visibility'],int(time.time()))) if allowed(d,uid,x)]
+  index=queue.index(r['id']) if r['id'] in queue else -1
+  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None}
 
 def validate(b):
  try:raw=base64.b64decode(b.get('media',''),validate=True)
@@ -125,6 +131,7 @@ def post(server,uid,action,b):
  if action=='publish':raw,mime=validate(b)
  with server.db() as d:
   d.execute('BEGIN IMMEDIATE')
+  if action=='privacy':return __import__('vibe_privacy').save(d,uid,b)
   if action=='share':return __import__('vibe_sources').publish(d,uid,b)
   if action=='dismiss_prompt':
    kind=b.get('kind');source=b.get('source')
