@@ -23,9 +23,9 @@ syncMainNavigation();
 window.addEventListener('resize',syncMainNavigation);
 function ensureHomeActivity(){
  const owner=account?.id||'';if(owner===homeActivityOwner)return;homeActivity?.destroy();homeActivity=null;homeActivityOwner=owner;
- for(const id of ['gamingTab','marketTab','vibeTab'])el(id).querySelector('.notification-badge')?.remove();
+ for(const id of ['gamingTab','marketTab'])el(id).querySelector('.notification-badge')?.remove();
  if(!owner)return;const scoped=async(path,body)=>{if(account?.id!==owner)throw Error('Account changed');const r=await api(path,body);if(account?.id!==owner)throw Error('Account changed');return r};
- homeActivity=OrbitActivity.create({api:scoped,category:'play',onOpen:()=>{}});homeActivity.subscribe((items,counts)=>{if(account?.id!==owner)return;for(const [id,key] of [['gamingTab','play'],['marketTab','market'],['vibeTab','vibe']])homeActivity.badge(el(id),counts[key]||0)})
+ homeActivity=OrbitActivity.create({api:scoped,category:'play',onOpen:()=>{}});homeActivity.subscribe((items,counts)=>{if(account?.id!==owner)return;for(const [id,key] of [['gamingTab','play'],['marketTab','market']])homeActivity.badge(el(id),counts[key]||0)})
 }
 
 const homeTarget=new URLSearchParams(location.search).get('home');if(homeTarget==='profile'&&account)showProfile(account.id);else if(homeTarget==='calls')chooseHome('calls');else if(homeTarget==='settings')toggleSettings(true);

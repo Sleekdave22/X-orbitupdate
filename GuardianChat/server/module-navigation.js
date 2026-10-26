@@ -22,11 +22,12 @@ if(['play','chat','market'].includes(module)){
   settings.onclick=()=>{if(native&&GuardianGaming.settings)GuardianGaming.settings();else location.assign('/?home=settings')};header?.append(settings);const bell=document.getElementById('marketActivityBell');if(bell)header.append(bell);
  }
 }
-function badge(target,count){let b=target.querySelector('.chat-unread-badge');if(!count){b?.remove();return}if(!b){b=make('span');b.className='chat-unread-badge';target.append(b)}b.textContent=count>99?'99+':String(count);b.setAttribute('aria-label',count+' unread messages')}
+function badge(target,count,label='unread messages'){let b=target.querySelector('.chat-unread-badge');if(!count){b?.remove();return}if(!b){b=make('span');b.className='chat-unread-badge';target.append(b)}b.textContent=count>99?'99+':String(count);b.setAttribute('aria-label',count+' '+label)}
 function avatar(target,id){if(!target)return;target.dataset.accountId=id;const active=state?.vibes?.[id],live=active&&active.expires*1000>Date.now();target.classList.toggle('vibe-has-content',Boolean(live));let icon=target.querySelector('.vibe-profile-indicator');if(!live){icon?.remove();return}if(!icon){icon=make('button');icon.type='button';icon.className='vibe-profile-indicator';const img=make('img');img.src='/navigation-icons/vibe-icon.svg';img.alt='';icon.append(img);target.append(icon)}icon.setAttribute('aria-label','View active Vibe');icon.onclick=e=>{e.stopPropagation();e.preventDefault();location.assign('/vibe.html?item='+active.item+'&visibility='+active.visibility)}}
 function paint(){
  const account=accountNow();if(!account||state?.account!==account.id)return;
  for(const id of ['chatsTab','vibeChat']){const target=document.getElementById(id);if(target)badge(target,state.unread_messages)}
+ for(const [ids,key,label] of [[['callsTab','vibeCalls'],'missed_calls','unseen missed calls'],[['vibeTab'],'unseen_vibes','unseen Vibe posts']])for(const id of ids){const target=document.getElementById(id);if(target)badge(target,state[key],label)}
  document.querySelectorAll('[data-unread-chat]').forEach(n=>badge(n,state.unread_messages));
  document.querySelectorAll('[data-account-id]').forEach(n=>avatar(n,n.dataset.accountId));
  avatar(document.getElementById('ownAvatar'),account.id);

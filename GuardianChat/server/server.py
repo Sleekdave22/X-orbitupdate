@@ -71,6 +71,7 @@ class ChatServer(ThreadingHTTPServer):
         market.init(self)
         __import__("account_notifications").init(self)
         __import__("vibes").init(self)
+        __import__('navigation_state').init(self)
         __import__("wallet").init(self)
         __import__("account_invites").init(self)
         __import__("stream_lifecycle").init(self)
@@ -442,6 +443,10 @@ class Handler(BaseHTTPRequestHandler):
                     __import__('account_invites').record(db,uid,inviter)
                 self.reply(201,{'id':uid,'token':token,'name':name,'nickname':nickname});return
             uid=self.user()
+            if self.path=='/navigation/calls-seen':
+                try:self.reply(200,__import__('navigation_state').calls_seen(self.server,uid,body))
+                except PermissionError as e:self.reply(403,{'error':str(e)})
+                return
             if self.path=='/invitations/reset':
                 self.reply(200,__import__('account_invites').getown(self.server,uid,rotate=True));return
             if self.path.startswith('/leagues/'):
