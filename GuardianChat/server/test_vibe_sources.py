@@ -96,4 +96,24 @@ class UnifiedVibeTest(unittest.TestCase):
   self.call('/social/accept',{'target':b['id']},a['token'])
   post=self.share(a,'profile',a['id'],game='efootball',visibility='private',audience=[b['id']]);self.assertTrue(self.call('/vibe/media?id='+post['id']+'&protected=1',token=b['token'])['source']['available'])
 
+class SponsoredVibeJourneyTest(unittest.TestCase):
+ import test_sponsored_leagues as fixtures
+ setUp=fixtures.SponsoredLeagueTest.setUp;tearDown=fixtures.SponsoredLeagueTest.tearDown;call=fixtures.SponsoredLeagueTest.call;register=fixtures.SponsoredLeagueTest.register
+ league=fixtures.SponsoredLeagueTest.league;activate=fixtures.SponsoredLeagueTest.activate;search=fixtures.SponsoredLeagueTest.search;finish=fixtures.SponsoredLeagueTest.finish
+ def test_verified_sponsored_title_share_and_correction(self):
+  import sponsored_leagues
+  for u in self.players:
+   self.call('/identities/save',dict(game='efootball',game_id='game-'+u['id'],region='Nigeria',tz='Africa/Lagos',availability=[],platform='mobile',country='NG',visible=True),u['token'])
+  lid=self.league();self.activate();mid=self.search(lid);match=self.finish(mid)
+  winner=next(u for u in self.players if u['id']==match['a']);viewer=self.players[0]
+  self.assertEqual(self.call('/vibe/prompts',token=winner['token'])['prompts'],[])
+  self.clock+=201;sponsored_leagues.tick(self.server,self.clock)
+  with self.server.db() as d:version=d.execute('SELECT version FROM sl_leagues WHERE id=?',(lid,)).fetchone()[0]
+  self.call('/leagues/transition',dict(league=lid,version=version,state='COMPLETED',reason='All independent results finalized'),viewer['token'])
+  prompt=self.call('/vibe/prompts',token=winner['token'])['prompts'][0];self.assertEqual(prompt['kind'],'sponsored')
+  post=self.call('/vibe/share',dict(kind='sponsored',source=lid,game='efootball',visibility='public',client_id='sponsored-title-share'),winner['token'])
+  source=self.call('/vibe/media?id='+post['id'],token=viewer['token'])['source'];self.assertEqual(source['status'],'Verified trophy');self.assertEqual(source['gaming_id'],'game-'+winner['id'])
+  with self.server.db() as d:d.execute('UPDATE sl_standings SET points=99 WHERE league=? AND uid=?',(lid,winner['id']))
+  self.assertFalse(self.call('/vibe/media?id='+post['id'],token=viewer['token'])['source']['available'])
+
 if __name__=='__main__':unittest.main()

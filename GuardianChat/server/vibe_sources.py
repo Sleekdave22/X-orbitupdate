@@ -56,6 +56,11 @@ def resolve(d,viewer,owner,kind,source,game='',publishing=False,visibility='priv
   if l['game']!=game or l['state'] not in ('COMPLETED','ARCHIVED') or not l['final_snapshot'] or not standing or standing['position']!=1 or standing['played']<1:raise ValueError('No finalized league victory is available')
   results=d.execute('SELECT r.*,m.state,m.score_a AS actual_a,m.score_b AS actual_b FROM sl_results r JOIN gb_matches m ON m.id=r.match WHERE r.league=?',(source,)).fetchall()
   if not results or any(r['state']!='verified' or r['score_a']!=r['actual_a'] or r['score_b']!=r['actual_b'] for r in results) or d.execute("SELECT 1 FROM sl_appeals a JOIN sl_results r ON r.match=a.match WHERE r.league=? AND a.state='pending'",(source,)).fetchone():raise ValueError('League results are under review')
+  # Withhold a trophy while corrected results and the authoritative table differ.
+  for line in sponsored_leagues.table(d,source):
+   scores=[(r['score_a'],r['score_b']) if r['a']==line['uid'] else (r['score_b'],r['score_a']) for r in results if line['uid'] in (r['a'],r['b'])]
+   wins=sum(a>b for a,b in scores);draws=sum(a==b for a,b in scores)
+   if (line['played'],line['wins'],line['draws'],line['losses'],line['points'])!=(len(scores),wins,draws,len(scores)-wins-draws,3*wins+draws):raise ValueError('League standings are being recalculated')
   registered=d.execute('SELECT game_id FROM sl_registrations WHERE league=? AND uid=?',(source,owner)).fetchone()
   if not registered:raise ValueError('The competition identity record is unavailable')
   result['gaming_id']=registered[0]
