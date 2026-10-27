@@ -39,3 +39,11 @@ New shared UI: `server/media-editor.js`, `server/media-editor.css`. New processi
 Remaining consolidated-handoff milestones: mixed Plaza media/cover/gallery storage, storefront/profile and search improvements, and a separate conservative dead-code audit. These are not silently marked complete by this editor update.
 
 Manual check: open Vibe → + → choose a photo/video; adjust Crop (and Trim for video), Apply, then Done. Confirm the caption/audience survive, the composer shows the approved selection and nothing publishes until Publish is pressed. Repeat Crop in Plaza's existing photo picker. Check Android Back, no-change exit, changed-edit discard, retry and audio playback. A source longer than 60 seconds should produce individually removable Vibe segments.
+
+## Deployment evidence
+
+Implementation commit **`5afed99e92c0f6c8e5139ec58da12e83cc9822a7`** was pushed to `origin/feature/vibe-timed-navigation` on 27 October 2026. Both `https://localhost:8766/` and `https://localhost:8768/` now serve the same frozen implementation; new editor and existing module asset bytes were verified against the release. A consistent private SQLite backup preceded the restart. Database integrity passed, with all five users, twelve contacts and 203 messages retained, and additive editor tables present.
+
+Android **version 34, `0.34-shared-media-editor`**, installed successfully on the S21 under the unchanged `com.guardianlab.chat` package. All 53 bundled assets match server sources; all interface-manifest hashes match. Saved @s21 identity and authenticated Vibe, Plaza, match, navigation and 60-second editor-policy APIs were verified without changing the saved server or exposing credentials. Mainfirst's existing browser session still loads its Vibe page. Physical edit/composer acceptance has been requested and remains pending; installation/API checks do not substitute for that observation.
+
+The original X-Orbit checkout remains clean at `bf029cea24983f58022736cb44bbb8c2e18d73ff`. No merge into either repository's `main` branch was performed.
