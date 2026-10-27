@@ -75,7 +75,7 @@
     "wallet.js": "19973f6af5169851289ebafe0e0cd5fab874415be60a2daf9cd3867905c7a718"
   },
   "baseline_android_version": "0.25-x-orbit-market",
-  "target_android_version": "0.37-header-theme",
+  "target_android_version": "0.38-header-layout",
   "implementation_repository": "Sleekdave22/X-orbitupdate",
   "implementation_branch": "feature/vibe-timed-navigation",
   "active_repository": "Sleekdave22/X-orbitupdate",

@@ -13,3 +13,7 @@ const missing=boot({cached:false,owner:'other'});assert.equal(missing.styles['--
 for(const name of ['index.html','gaming.html','market.html','vibe.html','wallet.html']){const html=fs.readFileSync(__dirname+'/'+name,'utf8'),tag='<script src="/personalization.js"></script>';assert.equal(html.split(tag).length-1,1,name);assert(html.indexOf(tag)<html.indexOf('<link rel="stylesheet"'),name+' must apply saved appearance before styles');assert(!html.includes('defer src="/personalization.js"'));}
 const chat=fs.readFileSync(__dirname+'/index.html','utf8');assert(chat.indexOf('id="homeBack"')<chat.indexOf('<h1>OrbitChat</h1>'));assert(chat.includes('<details id="chatSearch"'));assert(chat.includes('id="addContact"'));assert(chat.includes("search:el('chatSearch')"),'Published layout must move the whole Search control, never pull the form out');
 console.log('Saved browser/native/wallet themes apply before DOM ready without network; header and collapsed Search contracts passed.');
+
+const nativeSource=fs.readFileSync(__dirname+'/../chat/src/main/java/com/guardianlab/chat/MainActivity.kt','utf8');
+assert(nativeSource.includes('private fun applyHomeOrder(root:LinearLayout){if(BuildConfig.COMPARISON_INTERFACE)return;'),'Legacy published order must not move Search above the fixed comparison module strip');
+console.log('Fixed native module order overrides legacy published Search-first layouts.');

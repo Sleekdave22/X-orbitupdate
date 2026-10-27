@@ -32,3 +32,11 @@ Reopen X_ORBIT, switch between Chat, Play and Plaza, and confirm the selected ap
 - Consistent private backup completed before restart. Database integrity passed; all 5 accounts, 12 contact records and 203 messages retained. No active call or stream was interrupted.
 - S21 installation completed successfully: versionCode 37, versionName 0.37-header-theme. Authenticated checks confirmed @s21, its saved server, navigation, Vibe, Plaza, match and editor-policy endpoints.
 - Deployed browser Chat visually checked with its restored account. S21 visual confirmation remains pending.
+
+## Android ordering correction — version 38
+
+The user’s S21 check found Chat’s module tabs below Search. The legacy published-home-order routine was still rearranging the native comparison screen after construction. Version 38 excludes the fixed comparison layout from that legacy ordering routine, matching the existing comparison guard on design refresh. Other build variants keep their original published-order behavior.
+
+Browser version 37 is already correctly ordered; this correction changes Android ordering only and needs no browser restart. A regression contract checks that the comparison guard remains in place. Physical confirmation will follow installation.
+
+Version 38 validation: debug build succeeded; all 38 JavaScript scripts and 23 JVM tests passed; all 70 manifest hashes and 53 bundled web assets verified. The initial build attempt hit a denied system temporary folder; the successful build used the authorized workspace temporary directory. The initial JavaScript launcher used the wrong working directory; the complete successful rerun used GuardianChat.
