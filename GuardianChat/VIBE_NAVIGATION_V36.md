@@ -25,3 +25,11 @@ Requested follow-ups to the version 35 stability repair, implemented in `Sleekda
 ## Acceptance and remaining scope
 
 Version 35's physical three-minute stability observation is recorded separately. New native tap/overlay geometry and appearance require a device check after version 36 installation. Broader mixed Plaza galleries/storefront work remains a separate consolidated-handoff milestone. Phone contact discovery and verification remain on hold at the user's request.
+
+## Deployed version
+
+Implementation commit `3e7b3670d9c44001bb0c6bbe0deffd581638f669` is pushed to `origin/feature/vibe-timed-navigation`. On 27 October 2026 both `https://localhost:8766/` and `https://localhost:8768/` were restarted on the same frozen version 36 source. Shared SQLite integrity and retained counts passed: five users, twelve contacts and 203 messages. A consistent private backup preceded deployment. New and existing asset bytes were checked against the release.
+
+S21 package `com.guardianlab.chat` updated successfully to version 36, `0.36-vibe-navigation`. All 53 packaged assets match server sources and the interface manifest matches. @s21 and its saved server/account were retained; authenticated navigation, Vibe, Plaza, match and editor-policy APIs passed. The live browser Vibe page loads the existing Mainfirst session. The final physical-device check has been requested and remains pending; no live Vibe or message was published to test it.
+
+The original X-Orbit checkout remains clean at `bf029cea24983f58022736cb44bbb8c2e18d73ff`. Neither repository's main branch was merged.
