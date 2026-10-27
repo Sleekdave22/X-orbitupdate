@@ -2,7 +2,7 @@ plugins { alias(libs.plugins.android.application) }
 android {
  namespace = "com.guardianlab.chat"
  compileSdk { version = release(36) { minorApiLevel = 1 } }
- defaultConfig { applicationId = if(providers.gradleProperty("orbitComparison").orNull == "true") "com.guardianlab.chat.compare" else "com.guardianlab.chat"; minSdk = 29; targetSdk = 36; versionCode = 36; versionName = "0.36-vibe-navigation"; buildConfigField("boolean", "COMPARISON_INTERFACE", "true"); buildConfigField("boolean", "BUNDLED_INTERFACE", (providers.gradleProperty("orbitComparison").orNull == "true").toString()); ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = if(providers.gradleProperty("orbitComparison").orNull == "true") "com.guardianlab.chat.compare" else "com.guardianlab.chat"; minSdk = 29; targetSdk = 36; versionCode = 37; versionName = "0.37-header-theme"; buildConfigField("boolean", "COMPARISON_INTERFACE", "true"); buildConfigField("boolean", "BUNDLED_INTERFACE", (providers.gradleProperty("orbitComparison").orNull == "true").toString()); ndk { abiFilters += "arm64-v8a" } }
  buildFeatures { buildConfig = true }
  sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/comparison-assets").get().asFile)
  compileOptions { sourceCompatibility = JavaVersion.VERSION_11; targetCompatibility = JavaVersion.VERSION_11 }

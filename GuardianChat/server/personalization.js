@@ -6,9 +6,10 @@
  const clearTint='linear-gradient(transparent,transparent)';
  function mix(hex,base,amount){hex=/^#[0-9a-f]{6}$/i.test(hex)?hex:'#202546';return '#'+[1,3,5].map(i=>Math.round(parseInt(hex.slice(i,i+2),16)*amount+base*(1-amount)).toString(16).padStart(2,'0')).join('')}
  function wallpaperTint(p,bright){if(p.id===fallback.id)return clearTint;const colors=bright?[mix(p.bubble,255,.32),mix(p.received,255,.42),mix(p.received,255,.18)]:[mix(p.bubble,0,.72),mix(p.received,0,.65),mix(p.received,0,.2)];return 'linear-gradient(180deg,'+colors[0]+','+colors[1]+' 56%,'+colors[2]+')'}
- function account(){try{return typeof GuardianGaming!=='undefined'?JSON.parse(GuardianGaming.session()):JSON.parse(localStorage.getItem('guardianchat-account')||'null')}catch(_){return null}}
+ function bridge(){return typeof GuardianGaming!=='undefined'?GuardianGaming:typeof GuardianWallet!=='undefined'?GuardianWallet:null}
+ function account(){try{const native=bridge();return native?JSON.parse(native.session()):JSON.parse(localStorage.getItem('guardianchat-account')||'null')}catch(_){return null}}
  function apply(p){p=p?.roles===2?p:fallback;for(const [css,key] of Object.entries(variables))document.documentElement.style.setProperty('--personal-'+css,p[key]||fallback[key]);for(const bright of [false,true])document.documentElement.style.setProperty('--personal-wallpaper-'+(bright?'light':'dark'),wallpaperTint(p,bright));document.documentElement.dataset.palette=p.id}
- function cached(id){try{return JSON.parse(localStorage.getItem('xorbit-palette-'+id))}catch(_){return null}}
+ function cached(id){try{const native=bridge();if(native&&typeof native.palette==='function')return JSON.parse(native.palette());return JSON.parse(localStorage.getItem('xorbit-palette-'+id))}catch(_){return null}}
  function selected(){return choices.find(p=>p.id===(draft||document.documentElement.dataset.palette))}
  function preview(p){
   const scene=document.getElementById('paletteScene');if(!scene||!p)return;
@@ -63,6 +64,9 @@
   for(const [id,bright] of [['paletteDark',false],['paletteLight',true]])document.getElementById(id).onclick=()=>{previewBright=bright;preview(selected())};
   document.getElementById('paletteOptions').onkeydown=e=>{const directions={ArrowDown:1,ArrowRight:1,ArrowUp:-1,ArrowLeft:-1};if(busy||(!directions[e.key]&&!['Home','End'].includes(e.key)))return;e.preventDefault();const current=choices.findIndex(p=>p.id===selected()?.id),index=e.key==='Home'?0:e.key==='End'?choices.length-1:(current+directions[e.key]+choices.length)%choices.length;if(index<0||!choices[index])return;choose(choices[index].id);document.getElementById('paletteOptions').children[index].focus()};
  }
+ // Apply this account's saved appearance before any stylesheet or body can paint.
+ try{const native=bridge();if(native&&typeof native.moduleTabs==='function'&&native.moduleTabs())document.documentElement.classList?.add('native-module-shell');document.documentElement.dataset.theme=native&&typeof native.appearance==='function'?native.appearance():localStorage.getItem('guardianchat-theme')==='bright'?'bright':'dark'}catch(_){}
+ const initial=account();apply(initial?cached(initial.id):null);
  window.OrbitPersonalization={refresh};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mount();refresh(true)});else{mount();refresh(true)}
  setInterval(()=>refresh(),2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true)});window.addEventListener('storage',()=>refresh(true));

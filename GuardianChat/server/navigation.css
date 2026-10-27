@@ -91,3 +91,21 @@ body.orbit-module-shell #topGamingProfile .rank-avatar{width:32px;height:32px}
 body.orbit-module-shell #topGamingProfile .gaming-profile-identity strong{font-size:12px}
 body.orbit-module-shell #welcome{z-index:100}
 html.native-module-shell body.orbit-module-shell #topGamingProfile{max-height:none}
+
+/* Approved header/Search layout; the shared module strip keeps its coordinates. */
+.brand-header>h1{flex:1;min-width:0;margin-right:auto}
+#homeBack,body.orbit-module-shell>header>#back{width:28px;min-width:28px;height:44px;flex:0 0 28px;padding:0!important;margin:0!important;background:transparent!important;border:0!important;font-size:28px!important;color:var(--cyan-text)!important}
+body.orbit-module-shell>header,.brand-header{gap:8px!important}
+#playSettings,#marketSettings{width:32px;height:44px;min-width:32px;flex:0 0 32px;margin-left:auto!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:4px!important;color:var(--cyan-text)!important}
+#playSettings,#marketSettings{order:100}
+#marketActivityBell{order:90}
+#chatSearch{padding:8px;margin:0 0 8px;border:1px solid var(--line);border-radius:12px}
+#chatSearch>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:11px;background:var(--card2);font-size:12px}
+#chatSearch>summary::before{content:'⌕';font-size:18px}
+#chatSearch input{margin-bottom:0}
+html.native-module-shell :is(#playSettings,#marketSettings){display:none!important}
+html.native-module-shell body.orbit-module-shell>header>#back{display:none!important}
+@media(max-width:600px){body.orbit-module-shell #topGamingProfile{flex:0 1 38%;width:38%;min-width:0}body.orbit-module-shell>header h1{font-size:18px}}
+
+body.orbit-module-shell>main>#chatSearch{grid-column:1/-1;grid-row:1;width:100%;min-width:0;box-sizing:border-box;background:var(--card)}
+#chatSearch:not([open])>#addContact{display:none!important}
