@@ -75,6 +75,10 @@ class NavigationStateTest(unittest.TestCase):
   self.call('/vibe/privacy',{'public_audience':'everyone','exclude':[],'mute':[]},a['token'])
   with self.server.db() as d:d.execute('UPDATE vibe_items SET expires=1 WHERE id=?',(x['id'],))
   self.assertEqual(self.state(b)['unseen_vibes'],0)
+ def test_unseen_count_matches_contact_feed_not_unrelated_public_authors(self):
+  a=self.register('Author');b=self.call('/register',{'invite':self.server.invite,'name':'Unconnected'})
+  self.publish(a);self.assertEqual(self.state(b)['unseen_vibes'],0)
+  self.call('/contacts',{'code':a['id']},b['token']);self.assertEqual(self.state(b)['unseen_vibes'],1)
  def test_vibe_indicator_has_latest_reference_and_selected_audience_only(self):
   a=self.register('Author');b=self.register('Allowed');c=self.register('Excluded')
   x=self.publish(a,'private',audience=[b['id']]);y=self.publish(a,'private',audience=[b['id']]);badge=self.state(b)['vibes'][a['id']]

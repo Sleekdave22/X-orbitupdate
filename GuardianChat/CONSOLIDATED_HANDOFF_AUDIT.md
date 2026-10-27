@@ -34,3 +34,7 @@ One audit correction is needed in the new Vibe badge: only posts represented in 
 Version 33 passed 87 real HTTP/database backend tests, 36 JavaScript regression scripts and 23 JVM tests; the APK's 51 bundled assets match server sources. Both live browser addresses serve the frozen source; @s21 and Mainfirst are retained. Native installation and authenticated API access were verified. Physical editor/camera interactions will require separate device verification after implementation.
 
 The previously documented 13 legacy rating-test errors reproduce against unchanged version 31 and remain outside this handoff. Never classify those tests or untested media features as production-ready. Synthetic tests, isolated multi-account HTTP checks and physical-device observations must be reported separately. Feature and cleanup commits remain separate, with targeted rollback and preservation of the original repository.
+
+## 27 October clarification and editor milestone
+
+The user approved **60 seconds for video**. Vibe exports therefore split into contiguous segments of at most 60 seconds; the shared Plaza policy defaults to 60 seconds without splitting. The later Simple Media Editor handoff supersedes the proposed editor controls: implement Crop/Trim with Back/Done, leaving publication in the composer. The existing Plaza photo picker gains Crop; mixed photo/video listing galleries remain the next separate milestone. See `SIMPLE_MEDIA_EDITOR_UPDATE.md` for implemented scope, actual verification and remaining checks.

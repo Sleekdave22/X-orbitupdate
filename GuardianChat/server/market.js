@@ -89,8 +89,9 @@ function editor(a=null){
  const availability=select(f,'Availability','availability',['in_stock','made_to_order','unavailable'],a?.availability);
  const delivery=node('fieldset');delivery.append(node('legend','Delivery / pickup'));for(const type of ['pickup','local_delivery','shipping']){const l=node('label',type.replaceAll('_',' ')),i=node('input');i.type='checkbox';i.value=type;i.name='delivery';i.checked=(a?.delivery||['pickup']).includes(type);l.prepend(i);delivery.append(l)}f.append(delivery);
  const shipping=field(f,'Shipping countries (two-letter codes separated by commas)','shipping_countries',(a?.delivery_regions||[a?.country||'NG']).join(', '),'input',120);
- const photos=field(f,a?.images?.length?'Replace photos / portfolio (leave empty to retain)':'Photos / portfolio (optional except products)','photos','','input');photos.type='file';photos.accept='image/png,image/jpeg,image/webp';photos.multiple=true;
- const preview=node('div','','selected-photos');f.append(preview);photos.onchange=()=>preview.replaceChildren(node('p',photos.files.length+' photos selected'));
+ const photos=field(f,a?.images?.length?'Replace photos / portfolio (leave empty to retain)':'Photos / portfolio (optional except products)','photos','','input');photos.type='file';photos.accept='image/png,image/jpeg,image/webp';photos.multiple=true;let editedPhotos=[];
+ const preview=node('div','','selected-photos');f.append(preview);photos.onchange=async()=>{const selected=[...photos.files];photos.value='';if(!selected.length)return;try{const result=await OrbitMediaEditor.open({files:selected,destination:'plaza',token:account.token});if(!result)return;editedPhotos=result;paintPhotos()}catch(e){say(e.message)}};
+ function paintPhotos(){preview.replaceChildren();for(const part of editedPhotos){const card=node('div'),image=node('img');image.src='data:image/jpeg;base64,'+part.poster;image.alt='Edited listing photo';card.append(image,btn('Remove',()=>{editedPhotos=editedPhotos.filter(x=>x!==part);paintPhotos()}));preview.append(card)}sync()}
  f.append(node('p','Published photos are visible to other signed-in accounts.','muted'));
  const toggle=(i,on)=>{i.parentElement.hidden=!on;i.disabled=!on};
  function sync(changedType=false){
@@ -100,13 +101,13 @@ function editor(a=null){
   toggle(condition,product);toggle(availability,product);toggle(shipping,product);delivery.hidden=!product;for(const i of delivery.querySelectorAll('input'))i.disabled=!product;
   city.required=product||typed.details().work_mode!=='remote';
   p.parentElement.firstChild.textContent=kind==='JOB'?'Salary amount (range minimum)':'Price';
-  photos.required=product&&!a?.images?.length;photos.parentElement.firstChild.textContent=product?'Product photos (up to six, 3 MB each)':'Photos / portfolio (optional)';
+  photos.required=product&&!a?.images?.length&&!editedPhotos.length;photos.parentElement.firstChild.textContent=product?'Product photos (up to six, 3 MB each)':'Photos / portfolio (optional)';
  }
  typed.controls.sync=sync;sync();
  const actions=node('div','','row');f.append(actions);const key=crypto.randomUUID();
  for(const [state,label] of [['DRAFT','Save draft'],['ACTIVE','Publish listing']])actions.append(btn(label,()=>submit(state)));
  async function submit(state){
-  photos.required=state==='ACTIVE'&&typed.type.value==='PRODUCT'&&!a?.images?.length;if(!f.reportValidity())return;
+  photos.required=state==='ACTIVE'&&typed.type.value==='PRODUCT'&&!a?.images?.length&&!editedPhotos.length;if(!f.reportValidity())return;
   const buttons=[...actions.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
   try{
    if(photos.files.length>6||[...photos.files].some(x=>x.size>3*1024*1024))throw Error('Use up to six photographs, 3 MB each');
@@ -116,7 +117,7 @@ function editor(a=null){
    body.delivery_regions=shipping.disabled?[]:body.shipping_countries.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);delete body.shipping_countries;
    body.delivery=typed.type.value==='PRODUCT'?[...delivery.querySelectorAll('input:checked')].map(i=>i.value):[];
    body.attributes=Object.fromEntries([...attrs.querySelectorAll('input')].map(i=>[i.dataset.attribute,i.value]));body.state=state;body.client_id=key;
-   if(a){body.id=a.id;body.revision=a.revision}if(photos.files.length)body.images=await Promise.all([...photos.files].map(readFile));
+   if(a){body.id=a.id;body.revision=a.revision}if(editedPhotos.length)body.images=await Promise.all(editedPhotos.map(async part=>({data:(await api('/media-editor/media?id='+encodeURIComponent(part.media_id))).data})));else if(photos.files.length)body.images=await Promise.all([...photos.files].map(readFile));
    await act('save_listing',body,async r=>{await showListing(r.id);if(state==='ACTIVE')await OrbitVibeShare.show(api,{kind:'market',source:r.id},{prompt:true})});
   }catch(e){say(e.message)}finally{buttons.forEach(b=>b.disabled=false)}
  }

@@ -33,8 +33,8 @@ def get(server,uid):
     OR EXISTS(SELECT 1 FROM social_follows f WHERE f.follower=? AND f.target=i.uid AND f.state='accepted')) AS connected
    FROM vibe_items i JOIN users u ON u.id=i.uid WHERE i.expires>? AND i.media IS NOT NULL ORDER BY i.created,i.rowid""",(uid,uid,uid,uid,int(time.time()))):
    if not vibes.allowed(d,uid,r) or __import__('vibe_privacy').muted(d,uid,r['uid']):continue
-   if r['uid']!=uid and not r['viewed']:unseen+=1
    if not r['connected']:continue
+   if r['uid']!=uid and not r['viewed']:unseen+=1
    prior=active.get(r['uid']);count=(prior['count'] if prior else 0)+1
    active[r['uid']]={'count':count,'item':r['id'],'visibility':r['visibility'],'expires':r['expires']}
   return {'account':uid,'unread_messages':unread,'missed_calls':missed,'unseen_vibes':unseen,'vibes':active}

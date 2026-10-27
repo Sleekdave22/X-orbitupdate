@@ -1,5 +1,6 @@
 """Expiring account Vibes. Every media read rechecks audience, block and expiry."""
 import base64,hashlib,io,json,time,uuid
+from pathlib import Path
 from PIL import Image
 HOURS=(12,24,48)
 EMOJI=('❤️','🔥','😂','👏','😮','🎉')
@@ -15,6 +16,7 @@ def init(server):
  CREATE TABLE IF NOT EXISTS vibe_replies(message_id INTEGER PRIMARY KEY,item TEXT NOT NULL,visibility TEXT NOT NULL,sender TEXT NOT NULL,client_id TEXT NOT NULL,UNIQUE(sender,client_id));
  ''')
  with server.db() as d:
+  d.execute('CREATE TABLE IF NOT EXISTS vibe_media_metadata(item TEXT PRIMARY KEY,asset TEXT,duration_ms INTEGER NOT NULL,start_ms INTEGER NOT NULL,end_ms INTEGER NOT NULL)')
   __import__('vibe_sources').schema(d)
   __import__('vibe_privacy').schema(d)
 
@@ -106,7 +108,8 @@ def media(server,uid,ident,protected=False):
   source=__import__('vibe_sources').linked(d,uid,r);raw=__import__('vibe_sources').card(d,source) if source else r['media']
   queue=[x['id'] for x in d.execute('SELECT id,uid,visibility,expires,1 AS media FROM vibe_items WHERE uid=? AND visibility=? AND expires>? AND media IS NOT NULL ORDER BY created,rowid',(r['uid'],r['visibility'],int(time.time()))) if allowed(d,uid,x)]
   index=queue.index(r['id']) if r['id'] in queue else -1
-  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None}
+  metadata=d.execute('SELECT duration_ms,start_ms,end_ms FROM vibe_media_metadata WHERE item=?',(ident,)).fetchone()
+  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None}|(dict(metadata) if metadata else {})
 
 def validate(b):
  try:raw=base64.b64decode(b.get('media',''),validate=True)
@@ -122,13 +125,20 @@ def validate(b):
   except Exception as e:raise ValueError('Use a complete JPEG or PNG photo') from e
   return raw,actual
  if mime.startswith('video/'):
-  import result_reviews
-  return raw,result_reviews.video_probe(raw)['mime']
+  import subprocess,sys
+  code='import json,sys;from media_processing import validate_vibe_video;print(json.dumps(validate_vibe_video(sys.stdin.buffer.read())))'
+  try:info=json.loads(subprocess.run([sys.executable,'-c',code],input=raw,capture_output=True,cwd=Path(__file__).parent,timeout=25,check=True).stdout)
+  except Exception as e:raise ValueError('Use a valid video up to 60 seconds and 20 MB, or split it in the editor') from e
+  return raw,info['mime']
  raise ValueError('Vibes support JPEG, PNG, MP4 and WebM')
 
 def post(server,uid,action,b):
  now=int(time.time())
- if action=='publish':raw,mime=validate(b)
+ edited=None
+ if action=='publish':
+  if b.get('media_id'):
+   with server.db() as d:edited=__import__('media_editor').render(d,uid,b['media_id'],'vibe');raw,mime=edited['data'],edited['mime']
+  else:raw,mime=validate(b)
  with server.db() as d:
   d.execute('BEGIN IMMEDIATE')
   if action=='privacy':return __import__('vibe_privacy').save(d,uid,b)
@@ -165,6 +175,7 @@ def post(server,uid,action,b):
      if not d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone() or social.blocked(d,uid,target):raise PermissionError('Private Vibe recipients must be your available contacts')
    ident=uuid.uuid4().hex;expires=now+preferences(d,uid)[visibility+'_hours']*3600
    d.execute('INSERT INTO vibe_items VALUES(?,?,?,?,?,?,?,?,?,?)',(ident,uid,visibility,mime,raw,caption,now,expires,client,digest))
+   if edited:d.execute('INSERT INTO vibe_media_metadata VALUES(?,?,?,?,?)',(ident,edited['asset'],edited['duration_ms'],edited['start_ms'],edited['end_ms']))
    for target in set(audience) if visibility=='private' else ():
     d.execute('INSERT INTO vibe_audience VALUES(?,?)',(ident,target))
     __import__('account_notifications').add(d,target,'vibe','private','A contact shared a Private Vibe with you.',{'item':ident,'visibility':'private'})
