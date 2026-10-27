@@ -40,3 +40,5 @@ The user’s S21 check found Chat’s module tabs below Search. The legacy publi
 Browser version 37 is already correctly ordered; this correction changes Android ordering only and needs no browser restart. A regression contract checks that the comparison guard remains in place. Physical confirmation will follow installation.
 
 Version 38 validation: debug build succeeded; all 38 JavaScript scripts and 23 JVM tests passed; all 70 manifest hashes and 53 bundled web assets verified. The initial build attempt hit a denied system temporary folder; the successful build used the authorized workspace temporary directory. The initial JavaScript launcher used the wrong working directory; the complete successful rerun used GuardianChat.
+
+Version 38 installed successfully on the S21 from commit 752dfbaed170164a8f826e296ddc3bac84ae6a68. The installed version and @s21 account were authenticated and verified; existing server/API checks passed. Both browsers continue on the already-correct version 37 source. Phone visual confirmation of tabs above Search remains pending.
