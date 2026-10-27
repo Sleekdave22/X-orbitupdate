@@ -2,7 +2,7 @@ plugins { alias(libs.plugins.android.application) }
 android {
  namespace = "com.guardianlab.chat"
  compileSdk { version = release(36) { minorApiLevel = 1 } }
- defaultConfig { applicationId = if(providers.gradleProperty("orbitComparison").orNull == "true") "com.guardianlab.chat.compare" else "com.guardianlab.chat"; minSdk = 29; targetSdk = 36; versionCode = 34; versionName = "0.34-shared-media-editor"; buildConfigField("boolean", "COMPARISON_INTERFACE", "true"); buildConfigField("boolean", "BUNDLED_INTERFACE", (providers.gradleProperty("orbitComparison").orNull == "true").toString()); ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = if(providers.gradleProperty("orbitComparison").orNull == "true") "com.guardianlab.chat.compare" else "com.guardianlab.chat"; minSdk = 29; targetSdk = 36; versionCode = 35; versionName = "0.35-stability-editor"; buildConfigField("boolean", "COMPARISON_INTERFACE", "true"); buildConfigField("boolean", "BUNDLED_INTERFACE", (providers.gradleProperty("orbitComparison").orNull == "true").toString()); ndk { abiFilters += "arm64-v8a" } }
  buildFeatures { buildConfig = true }
  sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/comparison-assets").get().asFile)
  compileOptions { sourceCompatibility = JavaVersion.VERSION_11; targetCompatibility = JavaVersion.VERSION_11 }
@@ -10,6 +10,7 @@ android {
 dependencies {
  implementation("io.github.webrtc-sdk:android:144.7559.01")
  implementation("com.google.firebase:firebase-messaging:25.1.3")
+ implementation("com.caverock:androidsvg-aar:1.4")
  implementation(project(":guardianlab"))
  implementation(project(":guardianlab-ui"))
  implementation("androidx.activity:activity-ktx:1.8.0")

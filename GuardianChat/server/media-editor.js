@@ -65,7 +65,7 @@ async function open({files,destination,token}){
  const onHide=()=>close(),beforeLeave=e=>{if(!closed&&dirty()){e.preventDefault();e.returnValue=''}};window.addEventListener('pagehide',onHide,{once:true});window.addEventListener('beforeunload',beforeLeave);
  function release(){
   if(animation)cancelAnimationFrame(animation);animation=null;
-  if(media){media.pause?.();media.removeAttribute('src');media.remove();media=null}
+  if(media){media.onloadedmetadata=media.onloadeddata=media.onerror=null;media.pause?.();media.removeAttribute('src');if(media.tagName==='VIDEO')media.load();media.remove();media=null}
   if(url){URL.revokeObjectURL(url);url=null}
  }
  function setBusy(value){busy=value;done.disabled=value;done.textContent=value?'Preparing…':'Done';progress.hidden=!value;tools.querySelectorAll('button,input').forEach(n=>n.disabled=value)}
@@ -85,7 +85,7 @@ async function open({files,destination,token}){
    media.onerror=()=>status('This video cannot be previewed here. Choose another video.');
    media.src=url;media.load();if(s.duration)initialise(s.duration);
   }else{media.onload=()=>{done.disabled=false;showTools()};media.onerror=()=>status('This photo cannot be opened. Choose another photo.');media.src=url}
-  const draw=()=>{if(closed||!media)return;paint();animation=requestAnimationFrame(draw)};animation=requestAnimationFrame(draw);
+  let lastPaint='';const draw=()=>{if(closed||!media)return;const signature=JSON.stringify([mode,stage.clientWidth,stage.clientHeight,dimensions(),media.readyState,media.complete,state().rect,crop,media.currentTime,pointers.size]);if(signature!==lastPaint){paint();lastPaint=signature}animation=requestAnimationFrame(draw)};animation=requestAnimationFrame(draw);
   status('Originals stay unchanged. Done returns to your composer.');showTools();
  }
  function bounds(){
@@ -100,7 +100,7 @@ async function open({files,destination,token}){
   return {image,frame:{x:image.x+rect.x*image.w,y:image.y+rect.y*image.h,w:rect.w*image.w,h:rect.h*image.h},viewW:w,viewH:h};
  }
  function paint(){
-  const [sw,sh]=dimensions();if(!sw||!sh)return;const {w,h,ctx}=bounds();ctx.fillStyle='#090b20';ctx.fillRect(0,0,w,h);
+  const [sw,sh]=dimensions();if(!sw||!sh||video()&&media.readyState<2)return;const {w,h,ctx}=bounds();ctx.fillStyle='#090b20';ctx.fillRect(0,0,w,h);
   if(mode==='crop'&&crop){
    if(crop.viewW!==w||crop.viewH!==h)Object.assign(crop,cropMapping(rectangle(crop.frame,crop.image)));
    const i=crop.image,f=crop.frame;ctx.drawImage(media,i.x,i.y,i.w,i.h);ctx.fillStyle='#0009';ctx.beginPath();ctx.rect(0,0,w,h);ctx.rect(f.x,f.y,f.w,f.h);ctx.fill('evenodd');ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.strokeRect(f.x,f.y,f.w,f.h);
@@ -208,7 +208,7 @@ async function open({files,destination,token}){
     await new Promise(resolve=>{clip.onseeked=resolve;clip.currentTime=Math.min((i+.5)*state().duration/8000,Math.max(0,clip.duration-.05));setTimeout(resolve,1200)});
     if(!target.isConnected)break;const c=el('canvas');c.width=80;c.height=60;const scale=Math.max(80/clip.videoWidth,60/clip.videoHeight);c.getContext('2d').drawImage(clip,(80-clip.videoWidth*scale)/2,(60-clip.videoHeight*scale)/2,clip.videoWidth*scale,clip.videoHeight*scale);target.append(c);
    }
-  }catch(_){}finally{clip.removeAttribute('src');clip.remove()}
+  }catch(_){}finally{clip.onloadeddata=clip.onseeked=clip.onerror=null;clip.pause();clip.removeAttribute('src');clip.load();clip.remove()}
  }
  async function upload(s){
   if(s.asset){if(s.info.duration_ms)s.end=Math.min(s.end,s.info.duration_ms);return}status('Preparing… Uploading original.');progress.value=0;
