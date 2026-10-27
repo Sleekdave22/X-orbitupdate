@@ -64,3 +64,30 @@ body>header:has(.orbit-swipe-tabs){display:flex;flex-wrap:wrap;gap:9px;padding:1
 .plaza-notification-panel{position:fixed;right:10px;width:min(440px,calc(100vw - 20px));height:50dvh;max-height:calc(100dvh - 100px);z-index:1200;padding:15px;border:1px solid var(--line);border-radius:16px;overflow:auto;background:var(--orbit-settings-wallpaper) center/cover;color:var(--ink);box-shadow:0 12px 35px #0005;transform-origin:top right;animation:orbit-notice-in .2s ease-out}.plaza-notification-panel h2{font-size:17px;margin:0 0 8px}.plaza-notification-panel .orbit-notification-item{font-size:12px;background:color-mix(in srgb,var(--card) 75%,transparent)}
 @keyframes orbit-notice-in{from{opacity:0;transform:scale(.3) translateY(-12px)}to{opacity:1;transform:scale(1) translateY(0)}}
 @media(prefers-reduced-motion:reduce){.plaza-notification-panel{animation:none}.orbit-shared-line{transition:none!important}}
+
+/* Widen artwork only; keep tab boxes, icon heights and labels unchanged. */
+.orbit-bottom-nav .orbit-tab-artwork{position:relative;display:flex;align-items:center;justify-content:center;width:28.08px;height:26px;flex:none;line-height:0;overflow:visible}
+.orbit-bottom-nav .orbit-tab-artwork>img{width:26px;height:26px;transform:scaleX(1.08);flex:none}
+.orbit-bottom-nav .orbit-tab-artwork>.chat-unread-badge{right:-5px;top:-4px;line-height:16px}
+
+/* One viewport position for the three module selectors; page content stays separate. */
+body.orbit-module-shell>main{width:100%;max-width:none;box-sizing:border-box;padding:134px 8px 86px!important;margin:0!important}
+body.orbit-module-shell :is(.brand-header),body.orbit-module-shell>header{position:fixed!important;left:9px;right:9px;top:4px;height:66px;min-height:66px;box-sizing:border-box;margin:0!important;padding:4px 0!important;z-index:31;background:transparent!important}
+body.orbit-module-shell .orbit-module-switcher{position:fixed!important;left:9px;right:9px;top:76px;width:auto!important;height:48px;box-sizing:border-box;margin:0!important;z-index:31;flex-basis:auto!important;order:initial!important}
+.orbit-module-switcher[hidden]{display:none!important}
+html.native-module-shell body.orbit-module-shell>main{padding:8px 0 30px!important}
+html.native-module-shell body.orbit-module-shell>header{position:static!important;height:auto;min-height:0;padding:0!important;margin:0!important;width:100%;display:flex}
+html.native-module-shell body.orbit-module-shell>header h1,html.native-module-shell body.orbit-module-shell>header>div>p,html.native-module-shell .orbit-module-switcher{display:none!important}
+
+.orbit-module-switcher.orbit-swipe-tabs>button{justify-content:center!important;align-items:center!important}
+/* The selector itself never shifts or changes height between modules. */
+body.orbit-module-shell .orbit-module-switcher{align-items:flex-start!important;padding:0 0 6px!important}
+.orbit-module-switcher.orbit-swipe-tabs>button{height:42px!important;min-height:42px!important;max-height:42px!important;box-sizing:border-box;align-self:flex-start}
+body.orbit-module-shell>header>div:not(#topGamingProfile){flex:1;min-width:0}
+body.orbit-module-shell #topGamingProfile{max-height:66px;align-self:flex-start}
+body.orbit-module-shell #topGamingProfile .gaming-account-handle{font-size:11px;line-height:14px}
+body.orbit-module-shell #topGamingProfile .gaming-profile-identity{min-height:0!important;padding:3px 6px!important}
+body.orbit-module-shell #topGamingProfile .rank-avatar{width:32px;height:32px}
+body.orbit-module-shell #topGamingProfile .gaming-profile-identity strong{font-size:12px}
+body.orbit-module-shell #welcome{z-index:100}
+html.native-module-shell body.orbit-module-shell #topGamingProfile{max-height:none}

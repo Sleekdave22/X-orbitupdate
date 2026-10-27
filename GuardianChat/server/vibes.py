@@ -109,7 +109,7 @@ def media(server,uid,ident,protected=False):
   queue=[x['id'] for x in d.execute('SELECT id,uid,visibility,expires,1 AS media FROM vibe_items WHERE uid=? AND visibility=? AND expires>? AND media IS NOT NULL ORDER BY created,rowid',(r['uid'],r['visibility'],int(time.time()))) if allowed(d,uid,x)]
   index=queue.index(r['id']) if r['id'] in queue else -1
   metadata=d.execute('SELECT duration_ms,start_ms,end_ms FROM vibe_media_metadata WHERE item=?',(ident,)).fetchone()
-  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None}|(dict(metadata) if metadata else {})
+  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None,'previous_id':queue[index-1] if index>0 else None,'view_count':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(ident,)).fetchone()[0] if r['uid']==uid else None}|(dict(metadata) if metadata else {})
 
 def validate(b):
  try:raw=base64.b64decode(b.get('media',''),validate=True)
