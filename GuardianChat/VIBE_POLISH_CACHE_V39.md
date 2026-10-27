@@ -33,3 +33,13 @@ The existing status endpoint has additive public metadata and a cache tag. No da
 ## Manual check after installation
 
 Reopen X_ORBIT. Check the startup icon, the Vibe notification circle and My Vibe upload counter. Open a public video, move to another Vibe and back, then close/reopen it. Confirm smoother replay and unchanged reactions/replies. Check that Vibe-to-Chat keeps the four bottom tabs aligned.
+
+## Deployment
+
+Implementation commit: 9f8f84ad867d121c949b5299d758cf2df302b093 on feature/vibe-timed-navigation in Sleekdave22/X-orbitupdate.
+
+Both browser addresses serve the same frozen version 39 source. Changed assets, including the cache and navigation scripts, were byte-verified on both addresses. The initial probe ran before startup completed; the successful follow-up verified both running servers.
+
+A consistent private backup was completed before restart. Database integrity passed and all 5 accounts, 12 contact records and 203 messages were retained. No active call or stream was interrupted.
+
+S21 installation completed successfully: versionCode 39, versionName 0.39-vibe-polish. Authenticated checks confirmed @s21, its saved server and the existing navigation, Vibe, Plaza, match and media-editor policy endpoints. User confirmation of physical badge shape, startup size and public-video replay is pending.
