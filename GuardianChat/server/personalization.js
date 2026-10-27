@@ -65,7 +65,7 @@
   document.getElementById('paletteOptions').onkeydown=e=>{const directions={ArrowDown:1,ArrowRight:1,ArrowUp:-1,ArrowLeft:-1};if(busy||(!directions[e.key]&&!['Home','End'].includes(e.key)))return;e.preventDefault();const current=choices.findIndex(p=>p.id===selected()?.id),index=e.key==='Home'?0:e.key==='End'?choices.length-1:(current+directions[e.key]+choices.length)%choices.length;if(index<0||!choices[index])return;choose(choices[index].id);document.getElementById('paletteOptions').children[index].focus()};
  }
  // Apply this account's saved appearance before any stylesheet or body can paint.
- try{const native=bridge();if(native&&typeof native.moduleTabs==='function'&&native.moduleTabs())document.documentElement.classList?.add('native-module-shell');document.documentElement.dataset.theme=native&&typeof native.appearance==='function'?native.appearance():localStorage.getItem('guardianchat-theme')==='bright'?'bright':'dark'}catch(_){}
+ try{const native=bridge();if(native)document.documentElement.classList?.add('orbit-native');if(native&&typeof native.moduleTabs==='function'&&native.moduleTabs())document.documentElement.classList?.add('native-module-shell');document.documentElement.dataset.theme=native&&typeof native.appearance==='function'?native.appearance():localStorage.getItem('guardianchat-theme')==='bright'?'bright':'dark'}catch(_){}
  const initial=account();apply(initial?cached(initial.id):null);
  window.OrbitPersonalization={refresh};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mount();refresh(true)});else{mount();refresh(true)}

@@ -6,7 +6,7 @@ let homeActivity=null,homeActivityOwner='';
 function syncMainNavigation(){
  ensureHomeActivity();
  mainNavigation.hidden=!account||!['contacts','profile'].includes(activeScreen);
- mainNavigation.style.width=Math.min(940,Math.max(0,document.querySelector('main').getBoundingClientRect().width-16))+'px';
+
  const selected=activeScreen==='profile'?'profile':homeMode==='calls'?'calls':'chats';
  for(const key of ['vibe','chats','calls','profile']){const b=el(key+'Tab'),on=key===selected;b.setAttribute('aria-selected',String(on));b.setAttribute('aria-pressed',String(on));b.tabIndex=on?0:-1}
 }

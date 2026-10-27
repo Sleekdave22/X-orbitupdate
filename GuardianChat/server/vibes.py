@@ -45,6 +45,9 @@ def item(d,uid,ident):
  if not allowed(d,uid,r):raise PermissionError('This Vibe expired or is unavailable to your account')
  return r
 
+def cache_tag(r,source):
+ return r['digest']+':'+hashlib.sha256(json.dumps(source,sort_keys=True).encode()).hexdigest()
+
 def get(server,uid,action,q):
  if action=='privacy':return __import__('vibe_privacy').get(server,uid)
  with server.db() as d:
@@ -94,7 +97,10 @@ def get(server,uid,action,q):
    preview.thumbnail((160,160));out=io.BytesIO();preview.save(out,format='JPEG',quality=75)
    return {'data':base64.b64encode(out.getvalue()).decode(),'mime':'image/jpeg','expires':r['expires']}
   if action=='status':
-   r=item(d,uid,q.get('id',[''])[0]);source=__import__('vibe_sources').linked(d,uid,r);return {'active':True,'expires':r['expires'],'source':source if r['visibility']=='public' else None,'source_available':source is None or source['available']}
+   r=item(d,uid,q.get('id',[''])[0]);source=__import__('vibe_sources').linked(d,uid,r)
+   response={'active':True,'expires':r['expires'],'server_now':int(time.time()),'visibility':r['visibility'],'source':source if r['visibility']=='public' else None,'source_available':source is None or source['available']}
+   if r['visibility']=='public':response.update(cache_tag=cache_tag(r,source),relationship=__import__('social').public(d,uid,r['uid'])['relationship'],view_count=d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(r['id'],)).fetchone()[0] if r['uid']==uid else None)
+   return response
   if action=='viewers':
    r=item(d,uid,q.get('id',[''])[0])
    if r['uid']!=uid:raise PermissionError('Only the author can inspect viewers')
@@ -109,7 +115,7 @@ def media(server,uid,ident,protected=False):
   queue=[x['id'] for x in d.execute('SELECT id,uid,visibility,expires,1 AS media FROM vibe_items WHERE uid=? AND visibility=? AND expires>? AND media IS NOT NULL ORDER BY created,rowid',(r['uid'],r['visibility'],int(time.time()))) if allowed(d,uid,x)]
   index=queue.index(r['id']) if r['id'] in queue else -1
   metadata=d.execute('SELECT duration_ms,start_ms,end_ms FROM vibe_media_metadata WHERE item=?',(ident,)).fetchone()
-  return {'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None,'previous_id':queue[index-1] if index>0 else None,'view_count':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(ident,)).fetchone()[0] if r['uid']==uid else None}|(dict(metadata) if metadata else {})
+  return {'cache_tag':cache_tag(r,source) if r['visibility']=='public' else None,'data':base64.b64encode(raw).decode(),'mime':r['mime'],'expires':r['expires'],'server_now':int(time.time()),'caption':r['caption'],'uid':r['uid'],'visibility':r['visibility'],'source':source,'relationship':__import__('social').public(d,uid,r['uid'])['relationship'],'next_id':queue[index+1] if 0<=index<len(queue)-1 else None,'previous_id':queue[index-1] if index>0 else None,'view_count':d.execute('SELECT COUNT(*) FROM vibe_views WHERE item=?',(ident,)).fetchone()[0] if r['uid']==uid else None}|(dict(metadata) if metadata else {})
 
 def validate(b):
  try:raw=base64.b64decode(b.get('media',''),validate=True)

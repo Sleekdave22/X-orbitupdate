@@ -13,3 +13,7 @@ const native=fs.readFileSync(__dirname+'/../chat/src/main/java/com/guardianlab/c
 assert(fs.readFileSync(__dirname+'/vibe.html','utf8').includes('<span>Vibe</span>'));
 assert(!native.includes('if(key!="vibe")addView(text(label,10f)'),'Native Vibe must display its label like the other tabs');
 console.log('Four ordered tabs, supplied SVG parity, labelled accessible Vibe, retained upper Play/Market and native Profile/Vibe navigation passed.');
+
+assert(html.includes('<body class="orbit-module-shell" data-orbit-module="chat">'),'Chat layout must be known before its first body paint');
+assert(!fs.readFileSync(__dirname+'/orbit-navigation.js','utf8').includes('mainNavigation.style.width'),'Page content must not recalculate the four-tab width');
+assert(fs.readFileSync(__dirname+'/vibe.html','utf8').includes('id="vibeSettingsButton"'),'Reserve Vibe settings in the initial header');

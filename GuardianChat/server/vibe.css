@@ -19,3 +19,7 @@ dialog#vibeViewer{background:#080b13!important;color:#f4f5fa!important;border:0!
 .vibe-viewer-overlays :is(button,#vibeViewers){pointer-events:auto}
 .vibe-viewer-bottom{padding-top:3px;background:#080b13}
 #sendVibeReply{background:var(--personal-bubble,#7c3aed)!important;color:var(--personal-ink,#fff)!important}
+
+/* Count overlays remain complete circles, outside the preview's crop boundary. */
+.vibe-own-post,.vibe-row,.vibe-avatar{overflow:visible!important}
+.vibe-avatar .vibe-upload-count{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:20px;max-width:none;height:20px;padding:0 4px;border:0;border-radius:999px;background:#e53945;color:#fff;font:700 10px/20px system-ui;white-space:nowrap;overflow:visible}

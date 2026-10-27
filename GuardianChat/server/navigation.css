@@ -109,3 +109,9 @@ html.native-module-shell body.orbit-module-shell>header>#back{display:none!impor
 
 body.orbit-module-shell>main>#chatSearch{grid-column:1/-1;grid-row:1;width:100%;min-width:0;box-sizing:border-box;background:var(--card)}
 #chatSearch:not([open])>#addContact{display:none!important}
+
+/* Keep Chat's existing four-tab geometry on Vibe and My Orbit, from first paint. */
+.orbit-bottom-nav{width:min(940px,calc(100vw - 16px));height:68px;min-height:68px;max-height:68px;overflow:visible!important;border:0!important}
+.orbit-bottom-nav>button{height:56px!important;min-height:56px!important;max-height:56px!important;box-sizing:border-box;line-height:20px!important;overflow:visible!important}
+.orbit-bottom-nav .chat-unread-badge{display:flex!important;align-items:center;justify-content:center;min-width:16px;width:max-content;height:16px;padding:0 4px;box-sizing:border-box;max-width:none;border:0!important;border-radius:999px!important;background:#e53945!important;color:#fff!important;font:600 10px/16px system-ui!important;white-space:nowrap;overflow:visible!important}
+html.orbit-native #vibeFooter{display:none!important}
