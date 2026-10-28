@@ -1,9 +1,10 @@
 """Listing connections, offers and Market-only activity; no payments."""
-import hashlib,json,time,uuid
+import hashlib,json,time,uuid,threading
 import account_notifications as activity
 from market_pilot import accessible,amount,text,view,row
 
 def init(server):
+ if not hasattr(server,'market_push_lock'):server.market_push_lock=threading.Lock()
  with server.db() as d:d.executescript('''
  CREATE TABLE IF NOT EXISTS market_saves(uid TEXT NOT NULL,listing TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(uid,listing));
  CREATE TABLE IF NOT EXISTS market_offers(id TEXT PRIMARY KEY,listing TEXT NOT NULL,buyer TEXT NOT NULL,seller TEXT NOT NULL,amount_minor INTEGER NOT NULL,currency TEXT NOT NULL,state TEXT NOT NULL,turn TEXT NOT NULL,revision INTEGER NOT NULL,created INTEGER NOT NULL,expires INTEGER NOT NULL);
@@ -149,25 +150,35 @@ def post(server,uid,action,b):
   result={'ok':True,'id':ident};d.execute('INSERT INTO market_operations VALUES(?,?,?,?)',(uid,key,fingerprint,json.dumps(result)));return result
 
 def dispatch(server):
- """Session-scoped data-only push. Native fetches the authorized notice before display."""
- if not server.push.enabled or getattr(server,'market_push_busy',False):return
- with server.db() as d:
-  if not __import__('market_admin').settings(d)['notifications_enabled']:return
-  now=int(time.time());rows=[dict(r) for r in d.execute("SELECT a.* FROM account_activity a LEFT JOIN market_push_delivery p ON p.id=a.id WHERE a.category='market' AND a.seen=0 AND a.created>? AND coalesce(p.delivered,0)=0 AND coalesce(p.attempts,0)<6 AND coalesce(p.next_attempt,0)<=? ORDER BY a.id LIMIT 20",(now-86400,now))]
- if not rows:return
- import threading
- server.market_push_busy=True
- def deliver():
-  try:
-   for notice in rows:
-    with server.db() as d:
-     active=d.execute("SELECT seen FROM account_activity WHERE uid=? AND id=? AND category='market'",(notice['uid'],notice['id'])).fetchone()
-     if not active or active['seen']:continue
-     devices=[r['token'] for r in d.execute('SELECT p.token FROM push_devices p JOIN sessions s ON s.token_hash=p.session_hash AND s.user_id=p.user_id WHERE p.user_id=?',(notice['uid'],))]
-    accepted=bool(devices)
-    for token in devices:
-     try:server.push.send(token,{'event':'market_notice','notice_id':str(notice['id']),'recipient':notice['uid'],'expires_at':str(notice['created']+86400)})
-     except Exception:accepted=False
-    with server.db() as d:d.execute('INSERT INTO market_push_delivery(id,attempts,next_attempt,delivered) VALUES(?,1,?,?) ON CONFLICT(id) DO UPDATE SET attempts=attempts+1,next_attempt=excluded.next_attempt,delivered=excluded.delivered',(notice['id'],int(time.time())+300,int(accepted)))
-  finally:server.market_push_busy=False
- threading.Thread(target=deliver,daemon=True).start()
+ """One sender owns a batch; Demand limits reserve daily slots transactionally."""
+ if not server.push.enabled:return
+ lock=server.market_push_lock
+ if not lock.acquire(blocking=False):return
+ started=False
+ try:
+  with server.db() as d:
+   if not __import__('market_admin').settings(d)['notifications_enabled']:return
+   now=int(time.time());rows=[dict(r) for r in d.execute("SELECT a.* FROM account_activity a LEFT JOIN market_push_delivery p ON p.id=a.id WHERE a.category='market' AND a.seen=0 AND a.created>? AND coalesce(p.delivered,0)=0 AND coalesce(p.attempts,0)<6 AND coalesce(p.next_attempt,0)<=? ORDER BY a.id LIMIT 20",(now-86400,now))]
+  if not rows:return
+  server.market_push_busy=True
+  def deliver():
+   try:
+    for notice in rows:
+     with server.db() as d:
+      d.execute('BEGIN IMMEDIATE')
+      active=d.execute("SELECT seen FROM account_activity WHERE uid=? AND id=? AND category='market'",(notice['uid'],notice['id'])).fetchone()
+      if not active or active['seen']:continue
+      devices=[r['token'] for r in d.execute('SELECT p.token FROM push_devices p JOIN sessions s ON s.token_hash=p.session_hash AND s.user_id=p.user_id WHERE p.user_id=?',(notice['uid'],))]
+      if devices and not __import__('market_demand').push_allowed(d,notice,int(time.time())):
+       tomorrow=(int(time.time())//86400+1)*86400
+       d.execute('INSERT INTO market_push_delivery(id,next_attempt) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET next_attempt=excluded.next_attempt',(notice['id'],tomorrow))
+       continue
+     accepted=bool(devices)
+     for token in devices:
+      try:server.push.send(token,{'event':'market_notice','notice_id':str(notice['id']),'recipient':notice['uid'],'expires_at':str(notice['created']+86400)})
+      except Exception:accepted=False
+     with server.db() as d:d.execute('INSERT INTO market_push_delivery(id,attempts,next_attempt,delivered) VALUES(?,1,?,?) ON CONFLICT(id) DO UPDATE SET attempts=attempts+1,next_attempt=excluded.next_attempt,delivered=excluded.delivered',(notice['id'],int(time.time())+300,int(accepted)))
+   finally:server.market_push_busy=False;lock.release()
+  worker=threading.Thread(target=deliver,daemon=True);worker.start();started=True
+ finally:
+  if not started:lock.release()

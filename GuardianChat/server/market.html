@@ -6,4 +6,18 @@
 <nav class="mtabs"><button id="tabBrowse" type="button" aria-pressed="true">Browse</button><button id="tabShop" type="button" aria-pressed="false">My shop</button><button id="sellItem" type="button">Sell item</button></nav>
 <div id="notice" role="status" aria-live="polite"></div>
 <section id="view"></section>
-</main><script src="/activity-ui.js"></script><script src="/vibe-share.js"></script><script src="/market-types.js"></script><script src="/media-editor.js"></script><script src="/market.js"></script><script src="/orbit-switcher.js"></script><script src="/module-navigation.js"></script></body></html>
+<details id="marketDemand" class="mcard" hidden><summary>Requests &amp; Hot Demand</summary>
+<p id="demandStatus" role="status" aria-live="polite"></p><div id="demandFocus"></div>
+<details class="mcard"><summary>Describe what you need</summary><form id="demandRequest">
+<label>Request title<input id="demandTitle" maxlength="80" required></label>
+<label>Description<textarea id="demandDescription" maxlength="1000" required></textarea></label>
+<label>Category<select id="demandCategory" required></select></label>
+<label>Looking for<select id="demandKind"><option value="PRODUCT">Product</option><option value="SERVICE">Service</option><option value="SKILL">Skill / expertise</option><option value="JOB">Job / employment</option></select></label>
+<p class="muted">The request description is public. Other accounts see the combined demand count, without your account details.</p><button id="sendDemand" type="submit">Send request</button></form></details>
+<details id="demandSellerSettings" class="mcard" hidden><summary>Seller Demand notifications</summary><form id="demandSellerPreferences">
+<label><input id="demandSellerUpdates" type="checkbox">Notify me about relevant Hot Demand</label>
+<details><summary>Categories · leave empty to use my active listings</summary><div id="demandSellerCategories"></div></details>
+<button id="saveDemandPreferences" type="submit">Save preferences</button></form></details>
+<section id="demandMine"></section><h3>Demand opportunities</h3><button id="refreshDemands" type="button">Refresh requests</button><section id="demandList"></section><button id="moreDemands" type="button" hidden>More requests</button></details>
+
+</main><script src="/activity-ui.js"></script><script src="/vibe-share.js"></script><script src="/market-types.js"></script><script src="/media-editor.js"></script><script src="/market-demand.js"></script><script src="/market.js"></script><script src="/orbit-switcher.js"></script><script src="/module-navigation.js"></script></body></html>

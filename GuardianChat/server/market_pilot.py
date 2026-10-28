@@ -44,6 +44,7 @@ def init(server):
  __import__('market_connections').init(server)
  __import__('market_demo').init(server)
  __import__('market_admin').init(server)
+ __import__('market_demand').init(server)
 
 def catalog(d,all=False):
  return [dict(r)|{'subcategories':json.loads(r['subcategories']),'attributes':json.loads(r['attributes'])} for r in d.execute('SELECT * FROM market_categories'+('' if all else ' WHERE enabled=1')+' ORDER BY rowid')]
@@ -206,6 +207,7 @@ def post(server,uid,action,b):
    if state=='ACTIVE' and (not old or old['state']!='ACTIVE'):notify(d,uid,'published',ident,'Your listing is published: '+title)
    elif state=='PENDING_REVIEW':notify(d,uid,'review',ident,'Listing waiting for moderation: '+title)
    elif old:notify(d,uid,'edited',ident,'Listing updated: '+title)
+   if state=='ACTIVE':__import__('market_demand').enqueue(d,'listing',ident)
    return {'ok':True,'id':ident,'revision':revision}
  if action=='listing_state':
   with server.db() as d:
@@ -224,6 +226,7 @@ def post(server,uid,action,b):
    else:d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',(state,now,v['id']))
    d.execute('UPDATE market_ads SET status=? WHERE id=?',('held' if state=='PENDING_REVIEW' else state.lower(),v['id']));d.execute('INSERT INTO market_listing_audit(listing,actor,action,created,revision) VALUES(?,?,?,?,?)',(v['id'],uid,state,now,v['revision']+1))
    if state=='ACTIVE':d.execute('UPDATE market_ads SET expires=max(expires,?) WHERE id=?',(now+config['life_days']*86400,v['id']))
+   if state=='ACTIVE':__import__('market_demand').enqueue(d,'listing',v['id'])
    notify(d,uid,state.lower(),v['id'],'Listing '+state.lower()+': '+v['title']);return {'ok':True}
  if action=='report_seller':
   with server.db() as d:

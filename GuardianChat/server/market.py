@@ -78,6 +78,7 @@ def search_clause(q):
 
 
 def get(server, uid, path, query):
+    if path in ('/market/demands','/market/demand','/market/demand_preferences'):return __import__('market_demand').get(server,uid,path,query)
     if path=='/market/admin':return __import__('market_admin').get(server,uid)
     if path in ('/market/demo_wallet','/market/demo_orders','/market/demo_order'):
         return __import__('market_demo').get(server,uid,path,query)
@@ -139,6 +140,7 @@ def get(server, uid, path, query):
 
 
 def post(server, uid, action, b):
+    if action in ('demand_request','demand_withdraw','demand_preferences','admin_demand'):return __import__('market_demand').post(server,uid,action,b)
     if action in ('admin_config','admin_category','admin_seller','admin_feature','admin_synonym'):
         return __import__('market_admin').post(server,uid,action,b)
     if action in ('demo_deposit','demo_withdraw','demo_order_create','demo_order_action'):
@@ -175,6 +177,7 @@ def post(server, uid, action, b):
             d.execute('UPDATE market_listing_meta SET state=?,revision=revision+1,updated=? WHERE id=?',('ACTIVE' if action=='admin_restore' else 'REMOVED',now,ad['id']))
             __import__('account_notifications').add(d,ad['uid'],'market','shop','Your advert was '+('restored' if action=='admin_restore' else 'removed after review')+'.',{'ad':ad['id']})
             if action == 'admin_restore':
+                __import__('market_demand').enqueue(d,'listing',ad['id'])
                 d.execute('DELETE FROM market_reports WHERE ad=?', (ad['id'],))
             return {'ok': True}
         if action == 'report':
@@ -214,6 +217,7 @@ def post(server, uid, action, b):
             d.execute('INSERT INTO market_ads(id,uid,title,description,category,price,created,expires) VALUES(?,?,?,?,?,?,?,?)',
                       (ad_id, uid, title, description, category, price, now, now + policy['life_days']*86400))
             if policy['review_required'] or any(re.search(r'\b'+re.escape(t)+r'\b',title+' '+description,re.I) for t in policy['prohibited_terms']):d.execute("UPDATE market_ads SET status='held' WHERE id=?",(ad_id,))
+            if d.execute("SELECT status FROM market_ads WHERE id=?",(ad_id,)).fetchone()[0]=='active':__import__('market_demand').enqueue(d,'listing',ad_id)
             return {'ok': True, 'id': ad_id}
         if action in ('remove_ad', 'renew_ad'):
             ad = d.execute('SELECT * FROM market_ads WHERE id=? AND uid=?', (b.get('id'), uid)).fetchone()
