@@ -1,6 +1,6 @@
 # Demand and Hot Demand — version 41
 
-Status: implemented, tested, pushed as eb165a4 and deployed to both local browser addresses. See DEMAND_V41_DEPLOYMENT.md; phone installation remains deferred.
+Status: implemented, tested, pushed as eb165a4 and deployed to both local browser addresses. See DEMAND_V41_DEPLOYMENT.md; the S21 installation and page-open confirmation are now recorded there.
 Repository: Sleekdave22/X-orbitupdate, branch feature/vibe-timed-navigation.
 Original Sleekdave22/X-Orbit is not modified. Includes the already committed version 40 navigation/Vibe corrections.
 
@@ -67,7 +67,7 @@ Demand writes and notification creation run in existing explicit SQLite transact
 - Android debug build passed. 24 JVM tests passed; 73 manifest files and 56 bundled assets match the packaged APK.
 - Isolated browser account: submit request, see own/group count and withdraw passed; no browser warning/error logged. Failed-submit tests retain draft values and reuse the retry key.
 - Full backend: 388 tests in 593.571 seconds; 375 passed and the same 13 legacy rating-contract errors remain. No skipped tests or new failures. Details are in MASTER_ENGINEERING_REVIEW_20261028.md.
-- Live-account discovery, end-to-end real FCM delivery for this new feature and S21 physical UI checks are not claimed. Phone installation was deferred by the user.
+- Live-account discovery, end-to-end real FCM delivery for this new feature and S21 physical UI checks are not claimed. The user subsequently authorized installation and confirmed the Demand page opens normally; full device performance and real requester FCM display were not retested.
 
 ## Manual check after deployment
 

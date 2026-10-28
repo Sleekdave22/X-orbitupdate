@@ -10,6 +10,6 @@ Verified on 28 October 2026:
 - Additive Demand schema is present.
 - Existing real browser session loads its chat list, navigates to Plaza, displays the existing advert and opens Requests & Hot Demand with current policy and preferences.
 - No live test requests, adverts or messages were posted. Matching/requester notification tests used isolated fixtures.
-- Phone installation and physical UI checks remain deferred by the user. No new S21 version is claimed.
+- Phone installation was subsequently authorized and completed: version 41 is installed, the saved server/account/session are retained, authenticated profile/Demand/Plaza/Play requests succeed, and the user confirmed Requests & Hot Demand opens normally. Full device performance and real FCM requester-alert display were not retested.
 
 The rollout does not merge main or change the original X-Orbit repository. Logs, local paths, runtime PIDs and backup receipts remain outside Git.

@@ -48,7 +48,7 @@ No legacy tests were deleted/skipped and no obsolete rating functions were resto
 Version 41: 388 Python tests in 593.571 seconds; 375 passed, the same 13 legacy test errors remain, no skipped tests and no new failures. Error test names match the baseline exactly. All 41 JavaScript regression scripts passed.
 Browser: isolated Demand submit/count/withdraw and error-console check passed. The existing live browser session also searched for s21 and returned the real @s21 account marked In your chats; no contact/message was added. This read-only discovery check used the still-running version 39 backend. Earlier version 40 browser checks are documented separately.
 Android: debug build passed; 24 JVM tests passed with zero failures/errors/skips. All 73 interface hashes and 56 bundled assets match the APK.
-Physical S21 installation/testing deferred explicitly by the user. The real-account search above does not verify new enrollment, every privacy case or physical push delivery.
+Physical S21 installation was initially deferred, then authorized and completed. Version 41 and the saved @s21 session were verified; the user confirmed the Demand page opens normally. The account search and page-open check do not verify new enrollment, every privacy case, load performance or physical requester push delivery.
 
 ## Database, performance and failure isolation
 
@@ -89,7 +89,7 @@ The small VM + daily backup + illustrative R2 storage subtotal is $31.80/month, 
 
 ## Priorities after this stage
 
-1. Version 41 local browser deployment is complete (DEMAND_V41_DEPLOYMENT.md). Exercise requester alerts with consenting real accounts; phone installation stays deferred.
+1. Version 41 local browser deployment is complete (DEMAND_V41_DEPLOYMENT.md). Exercise requester alerts with consenting real accounts; S21 version 41 is also installed and its Demand page-open check passed.
 2. Resolve the legacy/current rating test and policy mismatch explicitly, preserving authoritative result math.
 3. Follow the separately requested behavior-preserving readability review, with a prioritized plan and developer guide, after the pending feature work is complete.
 4. Benchmark real browse/navigation workloads, then choose limited optimizations with output parity and concurrency tests.
