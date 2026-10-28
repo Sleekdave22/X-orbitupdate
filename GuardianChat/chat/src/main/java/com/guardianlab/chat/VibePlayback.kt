@@ -10,6 +10,7 @@ internal class VibePlayback(val limitMs:Long) {
   previous=now;visibleBefore=visible
   return elapsedMs.toFloat()/limitMs
  }
+ fun restart(){previous=null;visibleBefore=false;elapsedMs=0}
  val finished get()=elapsedMs>=limitMs
 }
 internal object VibeDismiss {

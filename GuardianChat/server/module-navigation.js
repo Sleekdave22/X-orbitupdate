@@ -4,7 +4,7 @@ let state=null,owner='',busy=false;
 const accountNow=()=>typeof account==='undefined'?null:account;
 const native=typeof GuardianGaming!=='undefined';
 const make=(tag,text='')=>{const n=document.createElement(tag);n.textContent=text;return n};
-function jump(page){if(native){if(page==='/')GuardianGaming.orbitChat();else if(page==='/gaming.html')GuardianGaming.orbitPlay();else GuardianGaming.market()}else location.assign(page)}
+function jump(page){if(native){if(page==='/')GuardianGaming.orbitChat();else if(page==='/gaming.html')GuardianGaming.orbitPlay();else GuardianGaming.market()}else if(window.OrbitFlow)window.OrbitFlow.navigate(page,({'/gaming.html':0,'/':1,'/market.html':2}[page]||0)-({'play':0,'chat':1,'market':2}[document.body.dataset.orbitModule]||0));else location.assign(page)}
 if(native&&GuardianGaming.moduleTabs?.())document.documentElement.classList.add('native-module-shell');
 const module=document.body.dataset.orbitModule||(document.getElementById('chatsTab')?'chat':'');document.body.dataset.orbitModule=module;
 if(['play','chat','market'].includes(module)){
@@ -25,7 +25,7 @@ if(['play','chat','market'].includes(module)){
  }
 }
 function badge(target,count,label='unread messages'){const host=target.querySelector('.orbit-tab-artwork')||target;let b=target.querySelector('.chat-unread-badge');if(!count){b?.remove();return}if(!b){b=make('span');b.className='chat-unread-badge';host.append(b)}b.textContent=count>99?'99+':String(count);b.setAttribute('aria-label',count+' '+label)}
-function avatar(target,id){if(!target)return;target.dataset.accountId=id;const active=state?.vibes?.[id],live=active&&active.expires*1000>Date.now();target.classList.toggle('vibe-has-content',Boolean(live));let icon=target.querySelector('.vibe-profile-indicator');if(!live){icon?.remove();return}if(!icon){icon=make('button');icon.type='button';icon.className='vibe-profile-indicator';const img=make('img');img.src='/navigation-icons/vibe-icon.svg';img.alt='';icon.append(img);target.append(icon)}icon.setAttribute('aria-label','View active Vibe');icon.onclick=e=>{e.stopPropagation();e.preventDefault();location.assign('/vibe.html?item='+active.item+'&visibility='+active.visibility)}}
+function avatar(target,id){if(!target)return;target.dataset.accountId=id;target.classList.remove('vibe-has-content');target.querySelector('.vibe-profile-indicator')?.remove()}
 function paint(){
  const account=accountNow();if(!account||state?.account!==account.id)return;
  for(const id of ['chatsTab','vibeChat']){const target=document.getElementById(id);if(target)badge(target,state.unread_messages)}

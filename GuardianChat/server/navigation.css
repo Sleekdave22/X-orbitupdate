@@ -115,3 +115,31 @@ body.orbit-module-shell>main>#chatSearch{grid-column:1/-1;grid-row:1;width:100%;
 .orbit-bottom-nav>button{height:56px!important;min-height:56px!important;max-height:56px!important;box-sizing:border-box;line-height:20px!important;overflow:visible!important}
 .orbit-bottom-nav .chat-unread-badge{display:flex!important;align-items:center;justify-content:center;min-width:16px;width:max-content;height:16px;padding:0 4px;box-sizing:border-box;max-width:none;border:0!important;border-radius:999px!important;background:#e53945!important;color:#fff!important;font:600 10px/16px system-ui!important;white-space:nowrap;overflow:visible!important}
 html.orbit-native #vibeFooter{display:none!important}
+
+/* Browser snapshots move content without transforming its fixed navigation. */
+@view-transition{navigation:auto}
+:root{--orbit-flow-enter:12%;--orbit-flow-exit:-12%}
+:root[data-orbit-flow=back]{--orbit-flow-enter:-12%;--orbit-flow-exit:12%}
+.orbit-bottom-nav{view-transition-name:orbit-bottom-tabs;touch-action:pan-y}
+.orbit-module-switcher{view-transition-name:orbit-module-tabs}
+.orbit-shared-line{view-transition-name:orbit-module-line}
+body.orbit-module-shell .brand-header,body.orbit-module-shell>header{view-transition-name:orbit-header}
+::view-transition-old(root){animation:orbit-page-out 220ms ease both}
+::view-transition-new(root){animation:orbit-page-in 220ms ease both}
+::view-transition-group(orbit-bottom-tabs),::view-transition-group(orbit-module-tabs),::view-transition-group(orbit-header){animation-duration:220ms}
+::view-transition-old(orbit-bottom-tabs),::view-transition-old(orbit-module-tabs),::view-transition-old(orbit-header){animation:orbit-chrome-out 220ms ease both}
+::view-transition-new(orbit-bottom-tabs),::view-transition-new(orbit-module-tabs),::view-transition-new(orbit-header){animation:orbit-chrome-in 220ms ease both}
+::view-transition-group(orbit-module-line){animation-duration:220ms}
+@keyframes orbit-page-out{to{opacity:0;transform:translateX(var(--orbit-flow-exit))}}
+@keyframes orbit-page-in{from{opacity:0;transform:translateX(var(--orbit-flow-enter))}}
+@keyframes orbit-chrome-out{to{opacity:0}}
+@keyframes orbit-chrome-in{from{opacity:0}}
+@media(prefers-reduced-motion:reduce){@view-transition{navigation:none}::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+
+/* Nav badges may overflow; decorative button sweeps must not. */
+.orbit-bottom-nav>button::after,.orbit-module-switcher>button::after{content:none!important;display:none!important;animation:none!important}
+.orbit-bottom-nav>button:active,.orbit-module-switcher>button:active{transform:none!important}
+
+.orbit-bottom-nav img,.orbit-module-switcher img{-webkit-user-drag:none;user-select:none}
+
+.orbit-bottom-nav,.orbit-module-switcher{-webkit-user-select:none;user-select:none}

@@ -23,3 +23,9 @@ dialog#vibeViewer{background:#080b13!important;color:#f4f5fa!important;border:0!
 /* Count overlays remain complete circles, outside the preview's crop boundary. */
 .vibe-own-post,.vibe-row,.vibe-avatar{overflow:visible!important}
 .vibe-avatar .vibe-upload-count{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:20px;max-width:none;height:20px;padding:0 4px;border:0;border-radius:999px;background:#e53945;color:#fff;font:700 10px/20px system-ui;white-space:nowrap;overflow:visible}
+
+/* Caption remains bottom-left, immediately above the reply line. */
+.vibe-viewer-overlays{padding-bottom:38px}
+.vibe-viewer-stage>#vibeCaptionView{position:absolute;left:14px;right:14px;bottom:5px;z-index:3;margin:0;text-align:left;max-height:12dvh;overflow:auto;pointer-events:none;text-shadow:0 1px 4px #000;background:linear-gradient(transparent,#080b1366)}
+#vibeMedia video.vibe-video-pending{opacity:0}
+#vibeMedia video::-webkit-media-controls-start-playback-button,#vibeMedia video::-webkit-media-controls-overlay-play-button{display:none!important;-webkit-appearance:none}

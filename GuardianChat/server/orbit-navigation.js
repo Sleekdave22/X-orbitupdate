@@ -11,9 +11,12 @@ function syncMainNavigation(){
  for(const key of ['vibe','chats','calls','profile']){const b=el(key+'Tab'),on=key===selected;b.setAttribute('aria-selected',String(on));b.setAttribute('aria-pressed',String(on));b.tabIndex=on?0:-1}
 }
 chooseHome=mode=>{if(activeScreen!=='contacts')contacts();originalChooseHome(mode);syncMainNavigation()};
-el('vibeTab').onclick=()=>location.assign('/vibe.html');
-el('profileTab').onclick=async()=>{await showProfile(account.id);syncMainNavigation()};
-for(const mode of ['chats','calls'])el(mode+'Tab').onclick=()=>chooseHome(mode);
+const bottomIndex=()=>activeScreen==='profile'?3:homeMode==='calls'?2:1;
+const bottomChange=(index,fn)=>window.OrbitFlow?window.OrbitFlow.local(fn,index-bottomIndex()):fn();
+el('vibeTab').onclick=()=>window.OrbitFlow?window.OrbitFlow.navigate('/vibe.html',-1):location.assign('/vibe.html');
+el('profileTab').onclick=()=>bottomChange(3,async()=>{await showProfile(account.id);syncMainNavigation()});
+for(const mode of ['chats','calls'])el(mode+'Tab').onclick=()=>bottomChange(mode==='calls'?2:1,()=>chooseHome(mode));
+window.OrbitFlow?.bindTabs(mainNavigation,['vibeTab','chatsTab','callsTab','profileTab'].map(id=>({activate:()=>el(id).click()})),bottomIndex);
 mainNavigation.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const items=[...mainNavigation.querySelectorAll('button')],index=items.indexOf(document.activeElement),next=e.key==='Home'?0:e.key==='End'?3:(index+(e.key==='ArrowRight'?1:3))%4;items[next].focus();items[next].click()};
 const originalShow=show;show=which=>{originalShow(which);syncMainNavigation()};
 const management=document.createElement('div');management.className='profile-management';
