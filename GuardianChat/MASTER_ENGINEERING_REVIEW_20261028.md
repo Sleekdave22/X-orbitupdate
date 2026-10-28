@@ -89,7 +89,7 @@ The small VM + daily backup + illustrative R2 storage subtotal is $31.80/month, 
 
 ## Priorities after this stage
 
-1. Deploy the tested local browser stage and exercise requester alerts with consenting real accounts; phone installation stays deferred.
+1. Version 41 local browser deployment is complete (DEMAND_V41_DEPLOYMENT.md). Exercise requester alerts with consenting real accounts; phone installation stays deferred.
 2. Resolve the legacy/current rating test and policy mismatch explicitly, preserving authoritative result math.
 3. Follow the separately requested behavior-preserving readability review, with a prioritized plan and developer guide, after the pending feature work is complete.
 4. Benchmark real browse/navigation workloads, then choose limited optimizations with output parity and concurrency tests.

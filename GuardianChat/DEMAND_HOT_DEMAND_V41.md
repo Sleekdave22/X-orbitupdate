@@ -1,6 +1,6 @@
 # Demand and Hot Demand — version 41
 
-Status: implementation and automated verification; browser deployment recorded separately.
+Status: implemented, tested, pushed as eb165a4 and deployed to both local browser addresses. See DEMAND_V41_DEPLOYMENT.md; phone installation remains deferred.
 Repository: Sleekdave22/X-orbitupdate, branch feature/vibe-timed-navigation.
 Original Sleekdave22/X-Orbit is not modified. Includes the already committed version 40 navigation/Vibe corrections.
 
