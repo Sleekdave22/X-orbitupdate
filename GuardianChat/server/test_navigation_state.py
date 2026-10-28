@@ -97,4 +97,19 @@ class NavigationStateTest(unittest.TestCase):
   self.call('/messages',dict(peer=b['id'],text='Blocked unread',client_id='nav-blocked'),a['token']);self.call('/social/block',{'target':a['id']},b['token'])
   self.assertEqual(self.state(b)['unread_messages'],0);self.assertNotIn(a['id'],self.state(b)['vibes'])
 
+ def test_empty_and_duplicate_receipts_count_unique_displayed_calls(self):
+  caller=self.register('Caller');viewer=self.register('Viewer')
+  self.assertEqual(self.call('/navigation/calls-seen',{'ids':[]},viewer['token']),{'seen':0})
+  ident=self.missed(caller,viewer)
+  self.assertEqual(self.call('/navigation/calls-seen',{'ids':[ident,ident]},viewer['token']),{'seen':1})
+  self.assertEqual(self.state(viewer)['missed_calls'],0)
+
+ def test_hidden_chat_snapshot_does_not_hide_later_messages(self):
+  sender=self.register('Sender');viewer=self.register('Viewer')
+  first=self.call('/messages',{'peer':viewer['id'],'text':'Before hiding','client_id':'before-hide'},sender['token'])['id']
+  with self.server.db() as d:d.execute('INSERT INTO chat_hidden(owner,peer,through_id) VALUES(?,?,?)',(viewer['id'],sender['id'],first))
+  self.assertEqual(self.state(viewer)['unread_messages'],0)
+  self.call('/messages',{'peer':viewer['id'],'text':'After hiding','client_id':'after-hide'},sender['token'])
+  self.assertEqual(self.state(viewer)['unread_messages'],1)
+
 if __name__=='__main__':unittest.main()
