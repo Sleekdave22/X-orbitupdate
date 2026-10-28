@@ -26,3 +26,7 @@ This pass preserves behavior. Bugs, features and ranking-policy decisions stay s
 No public identifier, route, table, schema, palette, UI placement, file upload, privacy/GuardianLab policy or money behavior changes.
 No code removal, broad renaming, new dependency or whole-controller rewrite.
 Commit documentation and each focused refactor separately. Record exact checks and gaps; phone UI testing does not establish backend equivalence.
+
+## First pass outcome
+
+Documentation/standards and the two focused refactors are complete. All seven new characterization cases passed before code changes; all 25 focused checks and 118 broader caller checks pass afterward. No SQL predicates, location results or public signatures changed. See READABILITY_VALIDATION.md for exact scope, checks and remaining confusing areas.
