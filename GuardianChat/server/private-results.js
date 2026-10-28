@@ -1,5 +1,10 @@
 'use strict';
 // Supersedes the earlier peer-photo result room. Evidence never enters its chat.
+/** Open a participant's private result conversation and maintain its receipts.
+ * @param {string} id Match/fixture ID, authorized on every backend request.
+ * @returns {Promise<void>} Resolves after initial render and polling setup.
+ * @throws {Error} Initial load failures; later errors appear in the page.
+ */
 async function privateResultRoom(id){
  resultCleanup?.();streamCleanup?.();
  const owner=account.id,initial=await api('/gamebox/result-state?room='+encodeURIComponent(id)+'&after=0');
@@ -14,6 +19,10 @@ async function privateResultRoom(id){
  const messages=node('form');messages.dataset.formInline='1';messages.className='result-chat-composer';
  const draft=input(messages,'Message to your opponent','text'),send=node('button','➤');draft.placeholder='Message your opponent…';send.type='submit';send.setAttribute('aria-label','Send result chat message');messages.append(send);view.classList.add('private-result-chat');view.append(comments,area,messages);
  messages.onsubmit=async e=>{e.preventDefault();if(!draft.value.trim()||closed)return;send.disabled=true;try{await api('/gamebox/result_comment',{room:id,text:draft.value.trim()});draft.value='';await poll()}catch(e){state.textContent=e.message}finally{send.disabled=false}};
+ /** Render safe receipts without interrupting an unsent camera capture.
+  * @param {Object} r Authenticated result packet, never peer evidence.
+  * @returns {void} UI errors propagate to the polling handler.
+  */
  function render(r){
   const review=r.evidence_review||{state:'not_submitted',submitted:false,received:0};
   const stamp=JSON.stringify([r.state,r.reports,r.can_report,review,r.final_score]);
@@ -25,7 +34,8 @@ async function privateResultRoom(id){
    if(['verified','confirmed'].includes(r.state)&&typeof offerGamingVibe==='function'){vibePromptChecked=false;offerGamingVibe()}
    if(r.final_score)area.append(node('strong',r.final_score[0]+' – '+r.final_score[1],'score'));
    area.append(node('p',r.final_score?'Final result saved. Relevant rankings, standings and match history have updated.':'This match is closed; no new evidence can be submitted.'),
-    button('View standings / rankings',async()=>{resultCleanup?.();tab=r.kind==='fixture'?'table':'open';await load()}));return;
+    button('View standings / rankings',async()=>{resultCleanup?.();tab=r.kind==='fixture'?'table':'open';await load()}));
+   appendResultAppeal(area,r,async()=>{signature='';await poll()});return;
   }
   const own=r.reports.find(x=>x.uid===owner);
   if(own&&Number.isInteger(own.score_a)&&Number.isInteger(own.score_b))area.append(node('p','Your independent score: '+own.score_a+' – '+own.score_b));
@@ -96,6 +106,62 @@ function privateVideoTools(match){
  return panel;
 }
 const originalOpenReview=reviewOpen;
-reviewOpen=async m=>{await originalOpenReview(m);$('view').append(privateVideoTools(m));};
+/** Extend existing review with private findings; preserve its decision action.
+ * @param {Object} m Authorized Studio match.
+ * @returns {Promise<void>} Rejects on initial review failures; summary errors show inline.
+ */
+reviewOpen=async m=>{if(m.state==='verified')$('view').replaceChildren(button('‹ Studio',()=>{tab='studio';render()}),node('h2','Final result appeal'));else await originalOpenReview(m);$('view').append(privateVideoTools(m));await appendReviewSummary($('view'),m);};
 const originalFixtureReview=review;
-review=f=>{originalFixtureReview(f);$('view').append(privateVideoTools(f));};
+/** Retain fixture review and add its independent findings.
+ * @param {Object} f Authorized fixture. @returns {void} Summary errors show inline.
+ * @throws {Error} Existing fixture rendering failures retain their caller's handling.
+ */
+review=f=>{originalFixtureReview(f);$('view').append(privateVideoTools(f));void appendReviewSummary($('view'),f);};
+
+/** Add an appeal action after finalization without exposing either player's proof.
+ * @param {HTMLElement} panel Result container.
+ * @param {Object} result Participant-safe result-state packet.
+ * @param {function(): Promise<void>} refresh Reload receipts after submission.
+ * @returns {void} Submission failures stay visible; scores are never edited here.
+ */
+function appendResultAppeal(panel,result,refresh){
+ const receipt=result.evidence_review||{};
+ if(receipt.appeal_state)panel.append(node('p','Appeal: '+receipt.appeal_state.replaceAll('_',' ')+'. Evidence is retained while review or correction is pending.','muted'));
+ if(!receipt.can_appeal)return;
+ panel.append(node('p','Request independent review by '+new Date(receipt.appeal_until*1000).toLocaleString()+'.','muted'));
+ const launch=button('Request review / appeal',()=>{
+  launch.disabled=true;const form=node('form'),reason=input(form,'Explain what needs reviewing','reason'),message=node('p','','muted'),send=node('button','Submit appeal');
+  form.dataset.formInline='1';reason.required=true;reason.minLength=10;reason.maxLength=1000;send.type='submit';form.append(send,message);panel.append(form);
+  form.onsubmit=async event=>{event.preventDefault();if(send.disabled)return;send.disabled=true;try{await api('/gamebox/evidence_appeal',{room:result.id,reason:reason.value.trim()});await refresh()}catch(error){message.textContent=error.message;send.disabled=false}};
+ });panel.append(launch);
+}
+
+/** Fetch and display evidence findings only through the independent-review API.
+ * @param {HTMLElement} view Existing authorized review page.
+ * @param {Object} match Match/fixture with id; backend checks roles again.
+ * @returns {Promise<void>} Network/permission errors remain visible without proof.
+ */
+async function appendReviewSummary(view,match){
+ const section=node('section','','card');section.append(node('h3','Automated findings and appeal review'));view.append(section);
+ try{
+  const summary=await api('/gamebox/review-summary?room='+encodeURIComponent(match.id));
+  section.append(node('p',summary.limitation,'muted'));
+  if(summary.review)section.append(node('p','Review: '+summary.review.state+' · '+summary.review.stage+' · '+summary.review.policy),node('p',summary.review.reason||'No escalation reason recorded.','muted'));
+  for(const report of summary.reports)section.append(node('p','Independent report · '+report.uid+': '+report.score_a+' – '+report.score_b));
+  for(const finding of summary.findings){
+   const analysis=finding.analysis;section.append(node('h4',finding.uid+' · '+finding.stage),node('p',analysis?.score?'Read score: '+analysis.score.join(' – '):'Inconclusive / not yet analyzed'),node('p',analysis?.reason||'Awaiting analysis.','muted'));
+   if(analysis?.text){const text=node('pre',analysis.text);text.style.whiteSpace='pre-wrap';section.append(text)}
+  }
+  for(const appeal of summary.appeals){
+   section.append(node('h4','Appeal · '+appeal.uid),node('p',appeal.reason),node('p','Status: '+appeal.state,'muted'));
+   if(appeal.decision)section.append(node('p','Decision: '+appeal.decision));
+   if(appeal.state!=='open')continue;
+   const form=node('form'),reason=input(form,'Independent decision reason','reason'),select=node('select'),message=node('p','','muted'),send=node('button','Record appeal decision');
+   form.dataset.formInline='1';reason.required=true;reason.minLength=10;reason.maxLength=1000;select.setAttribute('aria-label','Appeal outcome');
+   for(const [value,label] of [['upheld','Uphold recorded result'],['correction_required','Require audited correction · retain evidence']]){const option=node('option',label);option.value=value;select.append(option)}
+   select.value='upheld';send.type='submit';form.append(select,send,message);section.append(form);
+   form.onsubmit=async event=>{event.preventDefault();if(send.disabled)return;send.disabled=true;try{await api('/gamebox/evidence_appeal_decide',{room:match.id,player:appeal.uid,outcome:select.value,reason:reason.value.trim()});message.textContent='Decision recorded. Final scores were not silently changed.'}catch(error){message.textContent=error.message;send.disabled=false}};
+  }
+  if(summary.retention.evidence_held)section.append(node('p','Evidence cleanup is paused for an open appeal or required correction.','muted'));
+ }catch(error){section.append(node('p','Review summary unavailable: '+error.message,'muted'))}
+}

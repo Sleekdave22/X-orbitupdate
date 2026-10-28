@@ -279,13 +279,19 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(200,gamebox_core.summary(self.server,uid));return
             if parsed.path=='/gamebox/studio':
                 self.reply(200,gamebox_core.studio(self.server,uid));return
+            if parsed.path=='/gamebox/review-summary':
+                q=parse_qs(parsed.query)
+                with self.server.db() as db:
+                    match=__import__('result_reviews').match(db,q.get('room',[''])[0])
+                    summary=__import__('result_retention').summary(db,match,uid)
+                self.reply(200,summary);return
             if parsed.path=='/gamebox/result-state':
                 q=parse_qs(parsed.query);self.reply(200,gamebox_core.result_state(self.server,uid,q.get('room',[''])[0],int(q.get('after',['0'])[0])));return
             if parsed.path=='/gamebox/review-video':
                 q=parse_qs(parsed.query)
                 with self.server.db() as db:
                     match=__import__('result_reviews').match(db,q.get('room',[''])[0])
-                    if uid in (match['a'],match['b']) or not gaming.admin(db,uid):raise PermissionError('Evidence is private to an independent authorised reviewer')
+                    __import__('result_retention').reviewer(db,match,uid)
                     video=gamebox_core.row(db,'SELECT video,mime FROM result_review_videos WHERE kind=? AND match_id=? AND uid=?',(match['kind'],match['id'],q.get('player',[''])[0]))
                     if not video or not video['video']:self.reply(404,{'error':'Recording unavailable'});return
                 self.send_response(200);self.send_header('Content-Type',video['mime']);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(video['video'])));self.end_headers();self.wfile.write(video['video']);return

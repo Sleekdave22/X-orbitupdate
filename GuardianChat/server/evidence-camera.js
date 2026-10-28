@@ -1,8 +1,14 @@
 'use strict';
+/** Private capture widget; ordinary Vibe duration policy remains independent.
+ * @param {Object} options Container, callbacks, purpose and optional Vibe limit.
+ * @returns {{root: HTMLElement, active: function(): boolean, destroy: function(): void}}
+ * @throws {Error} DOM failures; device/recording failures are shown in the widget.
+ */
 window.OrbitEvidenceCamera={mount({container,videoRequired=false,onCapture,onActive,purpose='evidence',maxSeconds=60,includeAudio=false}){
+ maxSeconds=purpose==='vibe'?maxSeconds:Math.min(maxSeconds,10);
  const el=(tag,text='')=>{const x=document.createElement(tag);x.textContent=text;return x};
  const root=el('section'),preview=el('video'),photoPreview=el('img'),notice=el('p','Keep the PC/TV result screen open. Both gaming IDs, match details and final scores must be visible.');
- const vibe=purpose==='vibe';if(vibe)notice.textContent='Capture a Vibe. Videos can be up to '+maxSeconds+' seconds. Review it before publishing to your selected audience.';root.className='evidence-camera';preview.hidden=true;preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Your private camera preview');preview.style.cssText='width:100%;max-height:38vh;object-fit:contain;border-radius:14px;background:#080b18';
+ const vibe=purpose==='vibe';if(!vibe)notice.textContent+=' Record 3–10 seconds.';if(vibe)notice.textContent='Capture a Vibe. Videos can be up to '+maxSeconds+' seconds. Review it before publishing to your selected audience.';root.className='evidence-camera';preview.hidden=true;preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Your private camera preview');preview.style.cssText='width:100%;max-height:38vh;object-fit:contain;border-radius:14px;background:#080b18';
  photoPreview.hidden=true;photoPreview.alt='Your unsent camera photo';photoPreview.style.cssText=preview.style.cssText;
  const modes=el('div'),panel=el('section'),back=el('button',vibe?'‹ Back':'‹ Back to conversation'),open=el('button'),flip=el('button','↻'),shutter=el('button','●'),stop=el('button','Stop recording'),hint=el('p',videoRequired?'Video proof needed: tap to start, or hold and swipe up to lock.':'Tap the shutter for a photo. Hold for video; swipe up to lock.'),feedback=el('p');
  for(const b of [back,open,flip,shutter,stop])b.type='button';panel.hidden=true;
@@ -34,7 +40,7 @@ window.OrbitEvidenceCamera={mount({container,videoRequired=false,onCapture,onAct
    recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:1500000});parts=[];bytes=0;started=Date.now();
    recorder.ondataavailable=e=>{if(e.data.size){parts.push(e.data);bytes+=e.data.size;if(bytes>20*1024*1024)stopRecording()}};
    recorder.onerror=()=>{feedback.textContent='Recording interrupted. Please capture again.';recording=false;tracks()};
-   const current=recorder;recorder.onstop=()=>{const ready=new Blob(parts,{type:current.mimeType});parts=[];finalizing=false;if(destroyed)return;if(Date.now()-started<3000){feedback.textContent=vibe?'Record at least 3 seconds.':'Record at least 3 seconds; 12–60 seconds is best for showing navigation.';tracks();return}captured(ready)};
+   const current=recorder;recorder.onstop=()=>{const ready=new Blob(parts,{type:current.mimeType});parts=[];finalizing=false;if(destroyed)return;if(Date.now()-started<3000){feedback.textContent=vibe?'Record at least 3 seconds.':'Record at least 3 seconds; keep the recording within 10 seconds.';tracks();return}captured(ready)};
    recorder.start(500);recording=true;stop.hidden=false;shutter.textContent='■';feedback.textContent=vibe?'Recording Vibe · slide up to lock. Maximum '+maxSeconds+' seconds.':'Recording · show navigation, match details, scores and both gaming IDs. Slide up to lock.';
    limitTimer=setTimeout(stopRecording,maxSeconds*1000);announce();
   }catch(e){feedback.textContent=e.message}

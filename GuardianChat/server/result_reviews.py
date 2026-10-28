@@ -36,7 +36,13 @@ def identities(d,m):
     return aliases
 
 def init(server):
+    """Initialize private review and appeal storage for a ChatServer; return None.
+
+    Args: server (ChatServer): Connection owner; creates only additive schemas.
+    Raises: sqlite3.Error: Initialization fails rather than losing evidence state.
+    """
     with server.db() as d:
+        __import__('result_retention').init(d)
         d.executescript('''
         CREATE TABLE IF NOT EXISTS result_review_jobs(
           kind TEXT,match_id TEXT,state TEXT NOT NULL,policy TEXT NOT NULL,
@@ -92,6 +98,11 @@ def notify(d,m,text):
         __import__('account_notifications').link_play(d,ident,'open',m['id'],m['kind'])
 
 def status(d,m,uid):
+    """Return dict of safe receipts/appeal eligibility, never peer evidence.
+
+    Args: d (sqlite3.Connection), m (dict), uid (str): Authenticated read context.
+    Raises: sqlite3.Error: Query failure; this function does not acknowledge reads.
+    """
     job=row(d,'SELECT * FROM result_review_jobs WHERE kind=? AND match_id=?',(m['kind'],m['id']))
     stage=job['stage'] if job else 'photo'
     uploads=list(d.execute('SELECT uid,created FROM result_review_uploads WHERE kind=? AND match_id=? AND stage=?',(m['kind'],m['id'],stage)))
@@ -103,7 +114,8 @@ def status(d,m,uid):
             'response_seconds':job['response_seconds'] if job else RESPONSE_SECONDS,
             'can_upload':not own and m['state'] not in CLOSED and (not job or not job['deadline'] or time.time()<=job['deadline']),
             'automatic':bool(job and job['state'] in ('queued','processing')),
-            'score':[m['score_a'],m['score_b']] if m['state'] in ('verified','confirmed') else None}
+            'score':[m['score_a'],m['score_b']] if m['state'] in ('verified','confirmed') else None,
+            **__import__('result_retention').status(d,m,uid)}
 
 def active(d,m):
     return bool(d.execute('SELECT 1 FROM result_review_jobs WHERE kind=? AND match_id=?',(m['kind'],m['id'])).fetchone())
@@ -193,12 +205,18 @@ def require_both(d,m):
     if not count or count<2 and (not job['deadline'] or time.time()<job['deadline']):raise ValueError('Wait for the other player or the 15-minute response deadline, then validate the evidence before deciding')
 
 def finalized(d,kind,rid,a,b,actor,reason):
+    """Record a final decision and its frozen evidence deadline in caller's transaction.
+
+    Args: d (sqlite3.Connection); kind/rid (str); a/b (int); actor/reason (str).
+    Returns: None. Duplicate callbacks keep the original retention deadline.
+    Raises: ValueError for missing match; SQLite/JSON failures roll back the caller.
+    """
     previous=row(d,'SELECT state FROM result_review_jobs WHERE kind=? AND match_id=?',(kind,rid))
     d.execute("UPDATE result_review_jobs SET state='finalized',decision=?,reason=?,finished=?,lease=NULL,lease_until=NULL WHERE kind=? AND match_id=?",(json.dumps({'score':[a,b],'actor':actor}),reason[:500],int(time.time()),kind,rid))
     m=match(d,rid)
     if previous and previous['state']!='finalized':notify(d,m,'Match dispute resolved: '+str(a)+' – '+str(b)+'. Open the final result.')
     rules=json.loads(m['rules']) if kind=='open' else json.loads(row(d,'SELECT policy_snapshot FROM leagues WHERE id=?',(m['league'],))['policy_snapshot'] or __import__('gamebox_core').current(d)['config'])
-    d.execute('UPDATE result_review_videos SET expires=? WHERE kind=? AND match_id=?',(int(time.time())+rules['retention_seconds'],kind,rid))
+    __import__('result_retention').schedule(d,m,rules['retention_seconds'])
 
 def norm(value):return re.sub(r'[^a-z0-9]','',unicodedata.normalize('NFKC',str(value)).casefold())
 
@@ -251,40 +269,36 @@ def read_image(raw):
     result=subprocess.run([sys.executable,'-c',code],input=raw,capture_output=True,cwd=Path(__file__).parent,timeout=60,check=True)
     return json.loads(result.stdout)
 
-def inspect_video(raw,frames=False):
-    import av
-    images=[];last=-1;count=0;start=None;next_sample=0
-    with av.open(io.BytesIO(raw)) as container:
-        streams=container.streams.video
-        if len(streams)!=1:raise ValueError('Record one camera video')
-        stream=streams[0]
-        if stream.width*stream.height>1920*1080:raise ValueError('Use a recording up to 1080p')
-        name=container.format.name
-        mime='video/webm' if 'webm' in name or 'matroska' in name else 'video/mp4' if 'mp4' in name or 'mov' in name else None
-        if not mime:raise ValueError('Use an MP4 or WebM recording')
-        for frame in container.decode(stream):
-            count+=1
-            if count>4000 or frame.time is None:raise ValueError('Recording exceeds the supported duration')
-            if start is None:start=float(frame.time)
-            elapsed=float(frame.time)-start
-            if elapsed<last or elapsed>65:raise ValueError('Record up to 60 seconds with normal timestamps')
-            last=elapsed
-            if frames and elapsed>=next_sample:
-                image=frame.to_image();image.thumbnail((1280,720));out=io.BytesIO();image.save(out,format='JPEG',quality=85)
-                images.append(base64.b64encode(out.getvalue()).decode());next_sample+=5
-        if last<2:raise ValueError('Record at least 3 seconds showing navigation and the result')
-        if frames and len(images)<3:raise ValueError('Record long enough to show navigation and final details')
-        return {'mime':mime,'duration':last,'frames':[images[0],images[len(images)//2],images[-1]] if frames else []}
+def inspect_video(raw,frames=False,max_seconds=10):
+    """Compatibility wrapper for bounded video decoding, returning MIME/frames.
 
-def video_probe(raw,frames=False):
-    code='import json,sys;from result_reviews import inspect_video;print(json.dumps(inspect_video(sys.stdin.buffer.read(),'+str(frames)+')))'
+    Args: raw (bytes), frames (bool), max_seconds (int): See result_video.inspect.
+    Raises: ValueError or decoder errors for invalid media. No files are written.
+    """
+    return __import__('result_video').inspect(raw,frames,max_seconds)
+
+def video_probe(raw,frames=False,max_seconds=10):
+    """Validate private bytes in a bounded subprocess; return dict of media facts.
+
+    Args: raw (bytes), frames (bool), max_seconds (int): 60 only for stored proof.
+    Raises: ValueError: Validation/decode/timeout failure with safe capture guidance.
+    """
+    if max_seconds not in (10,60):raise ValueError('Unsupported evidence duration policy')
+    code='import json,sys;from result_reviews import inspect_video;print(json.dumps(inspect_video(sys.stdin.buffer.read(),'+str(bool(frames))+','+str(max_seconds)+')))'
     try:
         result=subprocess.run([sys.executable,'-c',code],input=raw,capture_output=True,cwd=Path(__file__).parent,timeout=25,check=True)
         return json.loads(result.stdout)
-    except Exception as error:raise ValueError('Could not validate this recording. Record 12–60 seconds, up to 1080p and 20 MB.') from error
+    except Exception as error:raise ValueError('Could not validate this recording. Record 3–'+str(max_seconds)+' seconds, up to 1080p and 20 MB.') from error
 
 def video_reading(raw,aliases,m):
-    frames=video_probe(raw,frames=True)['frames'];readings=[read_image(base64.b64decode(frame)) for frame in frames]
+    """Return (score or None, OCR text) for three consistent supported frames.
+
+    Args: raw (bytes): Stored proof; aliases (dict): Frozen IDs; m (dict): Match.
+    Raises: ValueError/subprocess errors: Worker defers to independent review.
+    The historical bound preserves recordings submitted before the 10-second cap.
+    This check cannot prove navigation authenticity or detect all manipulation.
+    """
+    frames=video_probe(raw,frames=True,max_seconds=60)['frames'];readings=[read_image(base64.b64decode(frame)) for frame in frames]
     decisions=[extract(r,aliases,m['a'],m['b'],m['game'])[0] for r in readings]
     texts=[str(r.get('text','')) for r in readings]
     # Simple text reading cannot prove navigation or authenticity. Only a very
@@ -362,7 +376,15 @@ def hold(d,m,reason):
     notify(d,m,'Private result evidence needs an independent reviewer. No score, ranking or league points have changed.')
 
 def dispatch(server):
-    with server.db() as d:d.execute('UPDATE result_review_videos SET video=NULL WHERE expires<? AND video IS NOT NULL',(int(time.time()),))
+    """Dispatch at most one worker and purge only due, unheld final evidence.
+
+    Args: server (ChatServer): Owns DB and process-local review lock.
+    Returns: None. Worker exceptions are logged without private evidence content.
+    Raises: sqlite3.Error: Cleanup failures propagate to the maintenance supervisor.
+    """
+    with server.db() as d:
+        d.execute('BEGIN IMMEDIATE')
+        __import__('result_retention').purge(d,int(time.time()))
     lock=server._result_review_lock
     if not lock.acquire(blocking=False):return
     def run():

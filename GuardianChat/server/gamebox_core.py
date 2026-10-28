@@ -122,9 +122,15 @@ def summary(server,uid):
    if m['state']=='awaiting_results' and not any(r['uid']==uid for r in m['reports']):m['reports']=[{'uid':r['uid'],'submitted':True} for r in m['reports']]
   return {'seasons':[dict(r)|{'registered':d.execute('SELECT COUNT(*) FROM gb_season_entries WHERE season=?',(r['id'],)).fetchone()[0],'joined':bool(d.execute('SELECT 1 FROM gb_season_entries WHERE season=? AND uid=?',(r['id'],uid)).fetchone()),'groups':[x[0] for x in d.execute('SELECT league FROM gb_season_groups WHERE season=? ORDER BY number',(r['id'],))]} for r in d.execute('SELECT id,name,game,tier,opens,closes,state FROM gb_seasons ORDER BY closes DESC LIMIT 30')],'version':version['id'],'config':config,'ids':[dict(r) for r in d.execute("SELECT i.* FROM gb_game_ids i JOIN gb_identity_meta m ON m.uid=i.uid AND m.game=i.game WHERE i.uid=? AND m.state='active'",(uid,))],'ratings':[dict(r)|__import__('rankings').stats(d,uid,r['game']) for r in d.execute('SELECT * FROM gb_ratings WHERE uid=?',(uid,))],'queue':row(d,'SELECT * FROM gb_queue WHERE uid=?',(uid,)),'matches':matches,'notices':__import__('match_scheduling').visible_notices(d,uid)}
 def studio(server,uid):
+ """Return authorized Studio state, including unresolved appeals on final results.
+
+ Args: server (ChatServer), uid (str): Authenticated administrator context.
+ Returns: dict of existing configuration, reviews and audit events.
+ Raises: PermissionError for unauthorized accounts; SQLite failures propagate.
+ """
  with server.db() as d:
   authorised(d,uid)
-  disputes=[dict(r) for r in d.execute("SELECT * FROM gb_matches WHERE state IN ('disputed','review') AND a!=? AND b!=? ORDER BY created",(uid,uid))]
+  disputes=[dict(r) for r in d.execute("SELECT * FROM gb_matches WHERE (state IN ('disputed','review') OR id IN (SELECT match_id FROM result_evidence_appeals WHERE kind='open' AND state IN ('open','correction_required'))) AND a!=? AND b!=? ORDER BY created",(uid,uid))]
   for m in disputes:
    m['evidence']=[dict(r) for r in d.execute('SELECT uid,mime,reading FROM gb_evidence WHERE match=?',(m['id'],))]
    m['video_evidence']=[dict(r) for r in d.execute('SELECT uid,mime,created FROM result_review_videos WHERE kind=\'open\' AND match_id=? AND video IS NOT NULL',(m['id'],))]
@@ -176,6 +182,14 @@ def verify(d,m,a,b,actor,reason='Matching independent typed reports'):
  __import__('result_reviews').finalized(d,'open',m['id'],a,b,actor,reason)
 
 def post(server,uid,action,b):
+ """Dispatch an authenticated Gamebox action with authoritative backend checks.
+
+ Args: server (ChatServer), uid (str), action (str), b (dict): HTTP action context.
+ Returns: dict response. Raises ValueError/PermissionError for invalid actions;
+ SQLite failures roll back caller-owned writes. Private appeals use their own
+ atomic transaction and never alter finalized scores through this dispatcher.
+ """
+ if action in ('evidence_appeal','evidence_appeal_decide'):return __import__('result_retention').appeal(server,uid,b,action=='evidence_appeal_decide')
  if action in ('evidence','result_evidence'):return __import__('result_reviews').submit(server,uid,b)
  if action=='result_signal':raise ValueError('Result evidence now uses private camera review. Reopen OrbitPlay to use the current result screen.')
  if action in ('schedule_propose','schedule_confirm'):
@@ -386,6 +400,12 @@ def post(server,uid,action,b):
   event(d,m['id'],uid,action,old={'state':m['state']},new={k:v for k,v in b.items() if k not in ('image','reading')});return {'ok':True}
 
 def tick(server,now=None):
+ """Maintain deadlines, queues and evidence under one database write transaction.
+
+ Args: server (ChatServer); now (int|None): Optional Unix test clock.
+ Returns: None. Raises SQLite/validation errors for the maintenance supervisor.
+ Evidence cleanup respects unresolved appeals and never changes finalized scores.
+ """
  now=int(time.time()) if now is None else now
  with server.db() as d:
   d.execute('BEGIN IMMEDIATE')
@@ -432,10 +452,8 @@ def tick(server,now=None):
    if pending['submitted']+rules['result_seconds']<now:
     d.execute("UPDATE fixtures SET state='disputed' WHERE id=?",(pending['id'],));event(d,pending['id'],'system','competition_submission_expired',reason='Silence is not proof; evidence and independent review required')
     for u in (pending['a'],pending['b']):notice(d,u,'League score response deadline passed. Both players may supply evidence for review.')
-  for expired_fixture in [dict(r) for r in d.execute("SELECT r.fixture FROM gb_comp_retention r JOIN fixtures f ON f.id=r.fixture WHERE r.expires<? AND f.state='confirmed'",(now,))]:
-   d.execute('UPDATE game_reports SET image=NULL WHERE fixture=?',(expired_fixture['fixture'],));d.execute('DELETE FROM gb_comp_retention WHERE fixture=?',(expired_fixture['fixture'],));event(d,expired_fixture['fixture'],'system','ordinary_competition_evidence_expired')
-  expired=[dict(r) for r in d.execute('SELECT e.match,e.uid FROM gb_evidence e JOIN gb_matches m ON m.id=e.match WHERE e.image IS NOT NULL AND e.expires<? AND m.state=\'verified\'',(now,))]
-  for e in expired:d.execute('UPDATE gb_evidence SET image=NULL WHERE match=? AND uid=?',(e['match'],e['uid']));event(d,e['match'],'system','ordinary_evidence_expired',new={'uid':e['uid']})
+  # Cleanup shares the same transaction as match maintenance and appeal holds.
+  __import__('result_retention').purge(d,now)
 
 def rate_competition_results(d,league):
  for f in [dict(r) for r in d.execute("SELECT * FROM fixtures WHERE league=? AND state='confirmed' AND id NOT IN (SELECT fixture FROM gb_rating_events)",(league['id'],))]:
