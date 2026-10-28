@@ -1,3 +1,5 @@
+> Current X-Orbit engineering entry point: [Developer guide](GuardianChat/DEVELOPER_GUIDE.md). The prototype notes below include historical behavior; use the guide and dated validation reports for the current integrated application.
+
 # GuardianLab Android
 
 GuardianLab is an Android screen privacy project using on-device computer vision to identify potential physical observation or external-camera capture risks and trigger a screen protection response.

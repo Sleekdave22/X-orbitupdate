@@ -1,3 +1,5 @@
+> Current X-Orbit engineering entry point: [Developer guide](DEVELOPER_GUIDE.md). The prototype notes below include historical behavior; use the guide and dated validation reports for the current integrated application.
+
 # GuardianChat — local Android test app
 
 A small one-to-one chat host for testing GuardianLab on two Android devices connected to the same trusted Wi-Fi. Open this folder in Android Studio. Select the `chat` run configuration. This is a separate project copied from the current GuardianLab SDK libraries; the original project has not been edited.
