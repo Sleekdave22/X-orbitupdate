@@ -61,7 +61,7 @@ class PhaseBTest(unittest.TestCase):
   a,b,c=self.user('Alpha'),self.user('Beta'),self.user('Gamma');self.identity(a);self.identity(b);self.identity(c)
   with self.server.db() as d:d.execute('INSERT INTO gb_rank_baselines VALUES(?,?,?,?,?,?)',(a['id'],'efootball',1500,10,10,int(time.time())));d.execute('INSERT INTO gb_rank_baselines VALUES(?,?,?,?,?,?)',(b['id'],'efootball',1500,10,10,int(time.time())));d.execute("UPDATE gb_identity_meta SET country='GB' WHERE uid=?",(b['id'],))
   allrows=self.rank(a)['players'];own=next(p for p in allrows if p.get('uid')==a['id']);self.assertEqual(self.rank(a,query='&country=NG')['my_rank']['global_rank'],own['global_rank'])
-  self.call('/contacts',{'code':b['id']},a['token']);self.assertEqual(self.rank(a,query='&friends=1')['total'],2)
+  self.call('/contacts',{'code':b['id']},a['token']);self.call('/social/message_accept',{'target':a['id']},b['token']);self.assertEqual(self.rank(a,query='&friends=1')['total'],2)
   first=self.rank(a,query='&limit=1');second=self.rank(a,query='&limit=1&offset=1');self.assertNotEqual(first['players'][0]['uid'],second['players'][0]['uid'])
  def test_privacy_and_blocks_apply_even_with_warm_rating_cache(self):
   a,b=self.user('Alpha'),self.user('Beta');self.identity(a);self.identity(b);self.rank(a)

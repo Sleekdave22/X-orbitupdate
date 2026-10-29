@@ -26,7 +26,7 @@ body{margin:0;background:var(--bg)!important;background-image:var(--pair-wallpap
 body:has(#gamingBrand){min-height:100vh;min-height:100dvh;background-size:cover!important;background-repeat:no-repeat!important}
 body:has(#gamingBrand)>header{background:transparent!important}
 button,input,select,textarea{font-family:var(--body)!important}
-h1,h2,h3,h4,.brand-header h1,header h1,#welcome strong,#orbitIntro strong{font-family:var(--display)!important;color:var(--ink)!important;letter-spacing:-.025em;line-height:1.2;font-weight:600}
+h1,h2,h3,h4,.brand-header h1,header h1,#welcome strong,#plazaWelcome strong,#orbitIntro strong{font-family:var(--display)!important;color:var(--ink)!important;letter-spacing:-.025em;line-height:1.2;font-weight:600}
 h1{font-size:clamp(23px,3vw,30px)}h2{font-size:22px}h3{font-size:17px}h4{font-size:15px}
 button{min-height:44px;padding:10px 16px!important;border:1.5px solid transparent!important;border-radius:12px!important;background:var(--card2)!important;color:var(--muted)!important;font-size:13px;font-weight:600;line-height:1.3;cursor:pointer;transition:background-color .15s,border-color .15s,filter .15s}
 button:hover{background:color-mix(in srgb,var(--cyan-text) 8%,transparent)!important}
@@ -104,13 +104,13 @@ nav.locked [data-tab=admin]:not([hidden]),nav.locked [data-tab=studio]:not([hidd
 .auth-welcome{padding-top:12px}
 .auth-choices button{background:var(--card2)!important;color:var(--muted)!important;border-color:transparent!important}
 .auth-choices button.selected{background:var(--personal-bubble,var(--violet))!important;color:var(--personal-ink,#fff)!important;border-color:transparent!important}
-#welcome,#orbitIntro{background:linear-gradient(#0b1520b8,#0b1520b8),var(--pair-wallpaper),var(--orbit-wallpaper) center/cover!important;background-blend-mode:normal,color,normal;color:#f1f5f9!important}
-#welcome :is(strong,p),#orbitIntro :is(strong,p,small){color:#f1f5f9!important}
+#welcome,#plazaWelcome,#orbitIntro{background:linear-gradient(#0b1520b8,#0b1520b8),var(--pair-wallpaper),var(--orbit-wallpaper) center/cover!important;background-blend-mode:normal,color,normal;color:#f1f5f9!important}
+#welcome :is(strong,p),#plazaWelcome :is(strong,p),#orbitIntro :is(strong,p,small){color:#f1f5f9!important}
 #welcome .ring{position:relative;width:132px;height:132px;margin-bottom:24px;display:grid;place-items:center}
 #welcome .ring::before{content:'';position:absolute;inset:0;border-radius:50%;border:3px solid var(--violet);border-top-color:var(--cyan)}
 #welcome .bar{width:min(280px,70vw);height:5px;background:var(--card2);border-radius:99px;overflow:hidden;margin:20px 0}
 #welcome .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan))}
-#welcome p,#orbitIntro small{color:var(--muted)!important}
+#welcome p,#plazaWelcome p,#orbitIntro small{color:var(--muted)!important}
 #personalizationDialog{max-width:480px}
 .palette-preview{border-radius:16px;padding:14px;margin:10px 0}
 .pair-preview{border:1px solid var(--line);border-radius:16px;padding:10px}

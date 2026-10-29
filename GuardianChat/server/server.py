@@ -66,11 +66,13 @@ class ChatServer(ThreadingHTTPServer):
         import social
         __import__("account_preferences").init(self)
         social.init(self)
+        __import__('message_pins').init(self)
         __import__("social_spaces").init(self)
         gaming.init(self)
         market.init(self)
         __import__("account_notifications").init(self)
         __import__("vibes").init(self)
+        __import__("message_requests").init(self)
         __import__('navigation_state').init(self)
         __import__('media_editor').init(self)
         __import__("wallet").init(self)
@@ -205,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
                 data=(Path(__file__).parent/parsed.path[1:]).read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(data)));self.end_headers();self.wfile.write(data);return
             if parsed.path in ('/branding/orbit-icon-plain.png','/branding/XOrbit-app-icon-1024.png','/branding/XOrbit-logo-dark.png','/branding/XOrbit-logo-light.png','/branding/orbit-wallpaper.png','/branding/orbit-wallpaper-v2.png','/branding/settings-dark.png','/branding/settings-light.png','/branding/orbit-icon-light.png'):
                 data=(Path(__file__).parent/parsed.path[1:]).read_bytes();self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
-            if parsed.path in ('/media-editor.js','/media-editor.css','/orbit-switcher.js', '/orbit-flow.js','/market-types.js', '/market-demand.js','/market-chat.js','/module-navigation.js','/module-settings.js','/vibe-motion.js','/vibe-cache.js','/vibe-share.js','/vibe.html','/vibe.js','/vibe.css','/activity-ui.js','/orbit-navigation.js','/navigation.css','/private-results.js','/evidence-camera.js','/camera-sources.js','/market.html','/market.js','/market.css','/calls.js','/call.html','/call-screen.js','/call-screen.css','/gaming.html','/gaming.js','/gaming.css','/studio.js','/result-room.js','/orbit-theme.js','/orbit-theme.css','/social.js','/profile-tabs.css','/social-spaces.js','/phase-b.js','/form-panels.js','/form-panels.css','/scheduling.js','/wallet.html','/wallet.js','/live-room-ui.js','/stream-relay-ui.js','/invitations.js','/join.js','/account-search.js','/sponsored-ui.js','/personalization.js','/personalization.json'):
+            if parsed.path in ('/media-editor.js','/media-editor.css','/orbit-switcher.js', '/orbit-flow.js','/module-intro.js','/market-types.js', '/market-demand.js','/market-chat.js','/module-navigation.js','/module-settings.js','/message-presentation.js','/chat-dates.js','/message-pins.js','/message-requests.js','/vibe-motion.js','/vibe-cache.js','/vibe-share.js','/vibe.html','/vibe.js','/vibe.css','/activity-ui.js','/orbit-navigation.js','/navigation.css','/private-results.js','/evidence-camera.js','/camera-sources.js','/market.html','/market.js','/market.css','/calls.js','/call.html','/call-screen.js','/call-screen.css','/gaming.html','/gaming.js','/gaming.css','/studio.js','/result-room.js','/orbit-theme.js','/orbit-theme.css','/social.js','/profile-tabs.css','/social-spaces.js','/phase-b.js','/form-panels.js','/form-panels.css','/scheduling.js','/wallet.html','/wallet.js','/live-room-ui.js','/stream-relay-ui.js','/invitations.js','/join.js','/account-search.js','/sponsored-ui.js','/personalization.js','/personalization.json'):
                 data=(Path(__file__).parent/parsed.path[1:]).read_bytes();self.send_response(200);self.send_header('Content-Type','application/json' if parsed.path.endswith('.json') else 'text/javascript' if parsed.path.endswith('.js') else 'text/css' if parsed.path.endswith('.css') else 'text/html');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
             if parsed.path=='/guardianchat-ca.crt':
                 data=(Path(__file__).parent.parent/'chat/src/main/res/raw/guardianchat_local_ca.crt').read_bytes();self.send_response(200);self.send_header('Content-Type','application/x-x509-ca-cert');self.send_header('Content-Disposition','attachment; filename=guardianchat-ca.crt');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
@@ -223,6 +225,10 @@ class Handler(BaseHTTPRequestHandler):
                 data=(Path(__file__).parent/'index.html').read_bytes()
                 self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(data);return
             uid=self.user()
+            if parsed.path=='/messages/pins':
+                try:self.reply(200,__import__('message_pins').get(self.server,uid,parse_qs(parsed.query).get('peer',[''])[0]))
+                except PermissionError as e:self.reply(403,{'error':str(e)})
+                return
             if parsed.path.startswith('/market/'):
                 try:self.reply(200,market.get(self.server,uid,parsed.path,parse_qs(parsed.query)))
                 except ValueError as e:self.reply(400,{'error':str(e)})
@@ -389,10 +395,14 @@ class Handler(BaseHTTPRequestHandler):
                         if item.get('kind')=='call':
                             history=db.execute('SELECT * FROM call_history WHERE id=?',(item['call_id'],)).fetchone()
                             if history:item['call']=self.server.call_event(history,uid)
+                        if not item.get('deleted_all') and not item.get('protected_media'):
+                            context=__import__('vibe_messages').context(db,item['id'])
+                            if context:item['vibe']=context
                         items.append(item)
                     unread=db.execute('SELECT COUNT(*) FROM messages WHERE sender=? AND recipient=? AND read_at=0',(peer,uid)).fetchone()[0]
                     deleted=[r['id'] for r in db.execute('SELECT id FROM messages WHERE deleted_all=1 AND ((sender=? AND recipient=?) OR (sender=? AND recipient=?))',(uid,peer,peer,uid))]
-                    self.reply(200,{'messages':items,'unread_count':unread,'deleted_ids':deleted});return
+                    pins=[] if __import__('social').blocked(db,uid,peer) else __import__('message_pins').visible(db,uid,peer)
+                    self.reply(200,{'messages':items,'unread_count':unread,'deleted_ids':deleted,'pins':pins});return
                 if parsed.path.startswith('/files/'):
                     fid=parsed.path.split('/')[-1]
                     row=db.execute('SELECT * FROM messages WHERE fileid=? AND (sender=? OR recipient=?) AND id NOT IN (SELECT message_id FROM message_hidden WHERE user_id=?)',(fid,uid,uid,uid)).fetchone()
@@ -500,6 +510,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.path.startswith('/social/'):
                 import social
                 try:self.reply(200,social.post(self.server,uid,self.path.split('/')[-1],body))
+                except PermissionError as e:self.reply(403,{'error':str(e)})
+                return
+            if self.path=='/messages/pin':
+                try:self.reply(200,__import__('message_pins').set_pin(self.server,uid,body))
+                except LookupError:self.reply(404,{'error':'Message unavailable'})
                 except PermissionError as e:self.reply(403,{'error':str(e)})
                 return
             if self.path in ('/messages','/messages/forward','/calls/start','/contacts'):
@@ -676,11 +691,13 @@ class Handler(BaseHTTPRequestHandler):
                 with self.server.db() as db:
                     other=db.execute('SELECT id,name FROM users WHERE id=? OR nickname=? COLLATE NOCASE',(code,lookup)).fetchone()
                     if not other or other['id']==uid:self.reply(400,{'error':'Enter another person’s valid contact code'});return
-                    code=other['id']
-                    db.execute('DELETE FROM chat_hidden WHERE owner=? AND peer=?',(uid,code))
-                    db.execute('INSERT OR IGNORE INTO contacts VALUES(?,?)',(uid,code))
-                    db.execute('INSERT OR IGNORE INTO contacts VALUES(?,?)',(code,uid))
-                self.reply(200,{'contact':dict(other)});return
+                    other=dict(other)
+                # New contact codes request consent. Existing contacts/history retain
+                # acceptance; clients must not open a pending conversation as connected.
+                result=__import__('social').post(self.server,uid,'message_request',dict(body,target=other['id']))
+                if result['state']=='accepted':
+                    with self.server.db() as db:db.execute('DELETE FROM chat_hidden WHERE owner=? AND peer=?',(uid,other['id']))
+                self.reply(200,dict(result,contact=other));return
             if self.path in ('/protected/open','/protected/received'):
                 device=str(body.get('device',''))
                 if not 32<=len(device)<=128:raise ValueError()

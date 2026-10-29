@@ -66,7 +66,7 @@ def get(server,uid,action,q):
    offset=max(0,int(q.get('offset',['0'])[0]));column,other=('target','follower') if action=='followers' else ('follower','target')
    rows=d.execute(f"SELECT u.id,u.name,u.nickname FROM social_follows f JOIN users u ON u.id=f.{other} WHERE f.{column}=? AND state='accepted' ORDER BY f.created DESC,u.id LIMIT 50 OFFSET ?",(target,offset))
    return {'users':[dict(r) for r in rows if not blocked(d,uid,r['id'])]}
-  if action=='message_requests':return {'users':[dict(r) for r in d.execute("SELECT u.id,u.name,u.nickname FROM social_message_requests r JOIN users u ON u.id=r.sender WHERE r.target=? AND r.state='pending' ORDER BY r.created DESC LIMIT 100",(uid,)) if not blocked(d,uid,r['id'])]}
+  if action=='message_requests':return {'users':__import__('message_requests').previews(d,uid)}
   if action=='requests':return {'users':[dict(r) for r in d.execute("SELECT u.id,u.name,u.nickname FROM social_follows f JOIN users u ON u.id=f.follower WHERE target=? AND state='pending' ORDER BY created DESC LIMIT 100",(uid,))]}
   if action=='blocks':return {'users':[dict(r) for r in d.execute('SELECT u.id,u.name,u.nickname FROM social_blocks b JOIN users u ON u.id=b.target WHERE owner=?',(uid,))]}
   if action=='notices':return {'notices':[dict(r) for r in d.execute('SELECT n.id,n.kind,n.created,n.seen,u.id AS actor,u.name FROM social_notices n JOIN users u ON u.id=n.actor WHERE n.uid=? AND n.id>? ORDER BY n.id DESC LIMIT 100',(uid,int(q.get('after',['0'])[0]))) if not blocked(d,uid,r['actor'])]}
@@ -81,6 +81,12 @@ def get(server,uid,action,q):
   raise ValueError('Unknown social action')
 
 def post(server,uid,action,b):
+ """Apply an authenticated social action atomically, returning its response dict.
+
+ Args: server (ChatServer), uid (str), action (str), b (dict): HTTP action context.
+ Raises ValueError/PermissionError for validation, privacy or rate failures;
+ SQLite errors roll back relationship and pending Vibe delivery changes together.
+ """
  with server.db() as d:
   d.execute('BEGIN IMMEDIATE')
   now=int(time.time());r=d.execute('SELECT * FROM social_rate WHERE uid=?',(uid,)).fetchone();count=r['count']+1 if r and r['start']>now-60 else 1;start=r['start'] if r and r['start']>now-60 else now
@@ -108,15 +114,20 @@ def post(server,uid,action,b):
   if action=='seen':d.execute('UPDATE social_notices SET seen=1 WHERE uid=? AND id<=?',(uid,int(b.get('through',0))));return {'saved':True}
   target=str(b.get('target',''))
   if target==uid or not d.execute('SELECT 1 FROM users WHERE id=?',(target,)).fetchone():raise ValueError('Choose another account')
+  if action=='message_report':return __import__('message_requests').report(d,uid,target,b)
+  if action=='message_decline_block':
+   existing=d.execute('SELECT state FROM social_message_requests WHERE sender=? AND target=?',(target,uid)).fetchone()
+   if not existing:raise PermissionError('Message request unavailable')
+   if existing['state']=='accepted':return {'state':'accepted'}
+   d.execute("UPDATE social_message_requests SET state='declined' WHERE sender=? AND target=?",(target,uid))
+   d.execute('INSERT OR IGNORE INTO social_blocks VALUES(?,?)',(uid,target))
+   d.execute('DELETE FROM social_follows WHERE (follower=? AND target=?) OR (follower=? AND target=?)',(uid,target,target,uid))
+   return {'state':'declined','blocked':True}
   if action=='block':
    d.execute('INSERT OR IGNORE INTO social_blocks VALUES(?,?)',(uid,target));d.execute('DELETE FROM social_follows WHERE (follower=? AND target=?) OR (follower=? AND target=?)',(uid,target,target,uid));return {'blocked':True}
   if action=='unblock':d.execute('DELETE FROM social_blocks WHERE owner=? AND target=?',(uid,target));return {'blocked':False}
   ensure(d,uid,target)
-  if action=='message_request':
-   if d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone():return {'state':'accepted'}
-   old=d.execute('SELECT state FROM social_message_requests WHERE sender=? AND target=?',(uid,target)).fetchone()
-   if old:return {'state':old['state']}
-   d.execute("INSERT INTO social_message_requests VALUES(?,?,'pending',?)",(uid,target,now));notice(d,target,uid,'message_request');return {'state':'pending'}
+  if action=='message_request':return __import__('message_requests').request(d,uid,target,b)
   if action in ('message_accept','message_decline'):
    state='accepted' if action=='message_accept' else 'declined'
    existing=d.execute('SELECT state FROM social_message_requests WHERE sender=? AND target=?',(target,uid)).fetchone()
@@ -125,6 +136,7 @@ def post(server,uid,action,b):
    cur=d.execute("UPDATE social_message_requests SET state=? WHERE sender=? AND target=? AND state='pending'",(state,target,uid))
    if cur.rowcount and state=='accepted':
     d.execute('INSERT OR IGNORE INTO contacts VALUES(?,?)',(uid,target));d.execute('INSERT OR IGNORE INTO contacts VALUES(?,?)',(target,uid));notice(d,target,uid,'message_accepted')
+    __import__('message_requests').deliver(d,target,uid)
    return {'state':state}
   if action=='follow':
    state='pending' if settings(d,target)['private'] else 'accepted';cur=d.execute('INSERT OR IGNORE INTO social_follows VALUES(?,?,?,?)',(uid,target,state,now))

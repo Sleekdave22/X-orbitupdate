@@ -12,6 +12,9 @@ One shared Python backend owns identities, SQLite data and feature decisions. Br
 | Identity, profiles, account search/preferences | server/social.py, account_invites.py, account_preferences.py; account-search.js, personalization.js | social_* and account_*; test_social.py, test_account_search.py, test_account_preferences.py |
 | Bottom-tab counts and seen receipts | server/navigation_state.py; orbit-navigation.js; MainActivity.kt | navigation_call_views, messages, vibe_views; test_navigation_state.py |
 | Module-owned settings and overlay layers | server/module-settings.js, module-navigation.js, navigation.css; MainActivity.kt showNavigationMenu/showSettings | Existing preferences and module tools; test_module_settings.js |
+| Vibe-to-chat reaction delivery and text presentation | server/vibe_messages.py; message-presentation.js; MessageTextPresentation.kt | vibe_reaction_deliveries, vibe_replies, messages; test_vibe_message_delivery.py, test_message_presentation.js |
+| Conversation dates and failed-send retry | server/chat-dates.js, index.html send/messages; ChatDates.kt, MainActivity.kt send/fetchMessages | No new storage; test_chat_dates.js, test_message_retry.js, ChatDatesTest.kt |
+| Shared message pins and new-connection consent | server/message_pins.py, message_requests.py, social.py; message-pins.js, message-requests.js; MainActivity.kt | message_pins, message_request_previews/reports; test_message_pins.py/js, test_message_requests.py/js |
 | Vibe feed, privacy, reactions/replies | server/vibes.py, vibe_privacy.py, vibe_sources.py; vibe.js, vibe-cache.js | vibe_*; test_vibes_activity.py, test_vibe_privacy.py, test_vibe_sources.py |
 | Crop/trim processing | server/media_editor.py, media_processing.py; media-editor.js | media_editor_*; test_media_editor.py, test_media_processing.py |
 | Gaming IDs, matching and scheduling | server/game_identities.py, gamebox_core.py, match_scheduling.py | gb_*, game_*; test_phase_b.py, test_gamebox_core.py, test_match_scheduling.py |
@@ -147,7 +150,7 @@ At the version 41 baseline, 388 Python tests ran: 375 passed and thirteen errors
 
 For future work, update this guide when file ownership or data flow changes, explain non-obvious decisions near the code, and keep behavior fixes separate from readability commits.
 
-## Section settings
+## Section settings and Vibe reactions
 
 Play/Plaza browser settings are rendered by `module-settings.js` over the current
 page. Never route their icons to `/?home=settings`: that recreates Chat and loses
@@ -159,3 +162,31 @@ child z-index cannot escape the fixed header's lower stacking context. Drawers u
 50% viewport width; keyboard Escape and focus remain within the owned drawer.
 Native account/settings overlays likewise use half the viewport.
 
+`vibe_messages.react` fixes the former reaction-only write: a successful contact
+reaction now commits the reaction, source reference and private chat message in one
+transaction before invoking the existing metadata-only push path. One delivery
+record per item/sender/emoji handles clients without retry IDs and concurrent
+retries. Selecting another emoji changes the current reaction; returning to an
+already-delivered emoji does not spam a duplicate chat message. No source caption
+or private media bytes enter a reaction preview.
+
+Recipient consent is authoritative. If the Vibe owner has not accepted the sender
+as a contact, the reaction is retained behind an existing message request, outside
+ordinary inbox/messages. `social.message_accept` materializes held reactions with
+original timestamps and unread status in the acceptance transaction. A decline
+never becomes an accepted contact and is not disclosed through the reaction
+response. This does not yet implement the complete new multi-message request
+preview/report/block workflow for ordinary unfamiliar messages.
+
+The additive delivery table has an explicit six-column upgrade: append visibility
+with a private default, restore it from existing source/reply metadata where
+available, and preserve every original key/message ID. Test migration twice against
+in-memory old rows before changing this schema. CREATE IF NOT EXISTS is insufficient.
+
+Visible text uses “Reply to Vibe” for either conversation side. Legacy stored
+headings are normalized only while rendering. The arrow remains normal-size;
+only the label is smaller/italic. Emoji-only message bodies render at 24 rather
+than 16 units (150%) in native chat and 1.5em in browser chat, without changing
+stored content. Both implementations recognize complete flags/keycaps/modifier/
+joined sequences; native uses a sorted Extended_Pictographic table to remain
+independent of Android ICU stubs during local JVM tests.

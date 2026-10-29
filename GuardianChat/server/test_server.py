@@ -14,7 +14,9 @@ class ChatTest(unittest.TestCase):
  def register(self,name):
   user=self.call('/register',{'invite':self.server.invite,'name':name})
   # Existing transfer tests use explicitly paired test accounts.
-  for other in getattr(self,'accounts',[]):self.call('/contacts',{'code':other['id']},user['token'])
+  for other in getattr(self,'accounts',[]):
+   self.call('/contacts',{'code':other['id']},user['token'])
+   self.call('/social/message_accept',{'target':user['id']},other['token'])
   self.accounts=getattr(self,'accounts',[])+[user]
   return user
  def test_call_push_is_session_scoped_and_contains_no_media(self):
@@ -212,6 +214,8 @@ class ChatTest(unittest.TestCase):
   for code in [a['id'],'unknown']:
    with self.assertRaises(urllib.error.HTTPError):self.call('/contacts',{'code':code},a['token'])
   self.call('/contacts',{'code':b['id'].upper()},a['token'])
+  self.assertEqual(self.call('/users',token=a['token'])['users'],[])
+  self.call('/social/message_accept',{'target':a['id']},b['token'])
   self.call('/contacts',{'code':b['id']},a['token'])
   self.assertEqual([u['id'] for u in self.call('/users',token=a['token'])['users']],[b['id']])
   self.assertEqual([u['id'] for u in self.call('/users',token=b['token'])['users']],[a['id']])
@@ -271,6 +275,7 @@ class ChatTest(unittest.TestCase):
   self.assertEqual(e.exception.code,409)
   with self.assertRaises(urllib.error.HTTPError):self.call('/profile?id='+a['id'],token=b['token'])
   self.call('/contacts',{'code':'@ALICE_TEST'},b['token'])
+  self.call('/social/message_accept',{'target':b['id']},a['token'])
   card=self.call('/profile?id='+a['id'],token=b['token']);self.assertEqual(card['id'],a['id']);self.assertNotIn('token_hash',card)
   changed=self.call('/profile',{'nickname':'new_alice','name':'Alice Updated'},a['token']);self.assertEqual(changed['id'],a['id'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/profile',{'nickname':'BOB_TEST'},a['token'])

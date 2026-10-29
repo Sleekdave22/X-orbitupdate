@@ -11,7 +11,9 @@ class MarketPushTest(unittest.TestCase):
    account_notifications.add(d,b['id'],'market','offers','Other account',{})
    d.execute('DELETE FROM sessions WHERE user_id=?',(b['id'],))
   self.assertEqual(self.call('/market/activity_item?id='+str(ident),token=a['token'])['notification']['text'],'Private offer details')
-  c=self.register('Third')
+  # This authorization probe needs an unrelated account, not paired contacts.
+  # B's session was deliberately revoked above and cannot accept a new request.
+  c=self.call('/register',{'invite':self.server.invite,'name':'Third'})
   with self.assertRaises(urllib.error.HTTPError):self.call('/market/activity_item?id='+str(ident),token=c['token'])
   class Fake:
    enabled=True

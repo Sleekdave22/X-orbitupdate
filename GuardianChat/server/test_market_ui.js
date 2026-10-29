@@ -7,11 +7,12 @@ assert(html.includes('el("marketTab").hidden=!account||activeScreen!=="contacts"
 const message=market.slice(market.indexOf('async function message('),market.indexOf('async function report('));
 const deep=html.slice(html.indexOf('async function openMarketSellerChat('),html.indexOf("el('marketTab').onclick"));
 (async()=>{
- let routed='',requested=[],failure=false,notice='';
- const c={native:false,encodeURIComponent,api:async(path,body)=>{requested.push([path,body]);if(failure)throw Error('Account interaction unavailable')},location:{assign:x=>routed=x},say:x=>notice=x};
+ let routed='',requested=[],failure=false,notice='',state='accepted';
+ const c={native:false,encodeURIComponent,api:async(path,body)=>{requested.push([path,body]);if(failure)throw Error('Account interaction unavailable');return {state}},location:{assign:x=>routed=x},say:x=>notice=x};
  vm.createContext(c);vm.runInContext(message,c);await c.message('seller/id','Seller');assert.equal(routed,'/?chat=seller%2Fid');assert.deepEqual(requested[0],['/contacts',{code:'seller/id'}]);
  routed='';failure=true;await c.message('blocked','Blocked');assert.equal(routed,'');assert(notice.includes('unavailable'));
  failure=false;c.native=true;c.GuardianGaming={openChat:(id,name)=>routed=id+':'+name};await c.message('native','Seller');assert.equal(routed,'native:Seller');
+ for(const native of [false,true]){routed='';state='pending';c.native=native;await c.message('pending','Seller');assert.equal(routed,'');assert(notice.includes('must accept'))}
  let opened=null,resolve;
  const d={URLSearchParams,account:{id:'owner'},activeScreen:'contacts',location:{search:'?chat=seller',pathname:'/'},history:{replaceState(){}},api:async()=>({users:[{id:'seller',name:'Seller'}]}),openChat:u=>opened=u.id,error:x=>notice=x};
  vm.createContext(d);vm.runInContext(deep,d);await d.openMarketSellerChat();assert.equal(opened,'seller');

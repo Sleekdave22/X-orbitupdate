@@ -27,7 +27,7 @@ class VibeViewerTest(VibeTest):
   first=self.call('/vibe/reply',body,viewer['token']);self.assertTrue(first['sent'])
   self.assertEqual(self.call('/vibe/reply',body,viewer['token'])['id'],first['id'])
   rows=self.call('/messages?peer='+viewer['id'],token=author['token'])['messages']
-  self.assertEqual(len(rows),1);self.assertEqual(rows[0]['text'],'↪ Reply to your Vibe\nGreat game!')
+  self.assertEqual(len(rows),1);self.assertEqual(rows[0]['text'],'↪ Reply to Vibe\nGreat game!')
   with self.server.db() as d:
    self.assertEqual(d.execute('SELECT item FROM vibe_replies WHERE message_id=?',(first['id'],)).fetchone()[0],post['id'])
    d.execute('UPDATE vibe_items SET expires=? WHERE id=?',(int(time.time())-1,post['id']))
@@ -42,7 +42,7 @@ class VibeViewerTest(VibeTest):
   private=self.publish(author,'private',audience=[viewer['id']])
   with self.assertRaises(urllib.error.HTTPError):self.call('/vibe/reply',dict(body,id=private['id']),stranger['token'])
   result=self.call('/vibe/reply',dict(body,id=private['id']),viewer['token'])
-  self.assertIn('Reply to your Private Vibe',self.call('/messages?peer='+author['id'],token=viewer['token'])['messages'][0]['text'])
+  self.assertIn('Reply to Vibe',self.call('/messages?peer='+author['id'],token=viewer['token'])['messages'][0]['text'])
   self.call('/social/block',{'target':viewer['id']},author['token'])
   with self.assertRaises(urllib.error.HTTPError):self.call('/vibe/reply',dict(body,client_id='blocked'),viewer['token'])
   with self.server.db() as d:self.assertEqual(d.execute('SELECT count(*) FROM contacts WHERE owner=?',(stranger['id'],)).fetchone()[0],0)

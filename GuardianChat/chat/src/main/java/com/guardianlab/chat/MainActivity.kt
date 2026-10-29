@@ -21,6 +21,7 @@ import androidx.activity.ComponentActivity
 import com.guardianlab.sdk.*
 import com.guardianlab.ui.ProtectionNotice
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import java.net.URLEncoder
 import java.util.UUID
@@ -97,7 +98,18 @@ class MainActivity:ComponentActivity(){
 
  private fun field(hint:String,value:String="")=EditText(this).apply {this.hint=hint;setText(value);setSingleLine(true);textSize=16f;typeface=bodyFont;setTextColor(ink);setHintTextColor(muted);background=GradientDrawable().apply {setColor(inputPaper);setStroke(dp(1),controlLine);cornerRadius=dp(12).toFloat()};setPadding(dp(12),dp(10),dp(12),dp(10));minHeight=dp(44)}
  private fun api()=ChatApi(prefs.getString("server","")!!,prefs.getString("token","")!!)
- private fun toast(s:String){Toast.makeText(this,s,Toast.LENGTH_LONG).show()}
+ private var chatFeedback:TextView?=null
+ private var chatConnectionError=false
+ /**
+  * Present messaging feedback inline; preserve ordinary toasts outside Chat.
+  * @param s Existing user-facing status/error.
+  * @return Unit; UI failures propagate.
+  * Delivery success already has receipt dots, so it does not create another banner.
+  */
+ private fun toast(s:String){
+  if(screen=="chat"){if(s !in setOf("Sent","Message sent","Reaction sent")){chatFeedback?.text=s;chatFeedback?.visibility=View.VISIBLE};return}
+  Toast.makeText(this,s,Toast.LENGTH_LONG).show()
+ }
  private fun async(work:()->Unit){net.execute {try{work()}catch(e:Exception){main.post {toast(e.message?:"Could not connect")}}}}
  override fun onCreate(savedInstanceState:Bundle?){
   super.onCreate(savedInstanceState);if(prefs.getString("server","")=="http://192.168.1.171:8765")prefs.edit().putString("server",ServerConfig.DEFAULT_SERVER).apply();window.setDecorFitsSystemWindows(false)
@@ -374,7 +386,7 @@ class MainActivity:ComponentActivity(){
   };root.addView(connect);root.addView(text("No phone number required. Your unique ID is stored on this device. Set a sign-in password in your profile to return to this same account.",13f));showContent(root)
  }
  private var people:LinearLayout?=null;private var homeCalls=false;private var homeSearch=false;private var accountSearchQuery=""
- @Volatile private var gamingWelcomeShown=false
+ private val moduleIntros = ModuleIntroSession.process
  private var pendingGameplayRoom:String?=null
  private var pendingGamingCapture:android.webkit.PermissionRequest?=null
  private var pendingMarketLocation:((Boolean)->Unit)?=null
@@ -495,7 +507,7 @@ class MainActivity:ComponentActivity(){
   fun callAction(icon:Int,label:String,video:Boolean)=ImageView(this).apply {tag="chat-call-icon";setImageResource(icon);imageTintList=android.content.res.ColorStateList.valueOf(accentText);contentDescription=label;isFocusable=true;setPadding(dp(12),dp(12),dp(12),dp(12));scaleType=ImageView.ScaleType.FIT_CENTER;foreground=OrbitPalette.focus(this@MainActivity,bright);setOnClickListener {openVoiceCall(false,video)}}
   header.addView(callAction(R.drawable.ic_video_call,"Video call",true),LinearLayout.LayoutParams(dp(44),dp(44)))
   header.addView(callAction(R.drawable.ic_call_handset,"Voice call",false),LinearLayout.LayoutParams(dp(44),dp(44)))
-  root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(4);bottomMargin=dp(4)});attachMarketContext(root);scroller=LatestMessageScrollView(this).apply {alpha=0f};messages=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroller!!.addView(messages);scroller!!.background=boundary().apply {setColor(Color.TRANSPARENT)};scroller!!.setPadding(dp(6),0,dp(6),0);scroller!!.viewTreeObserver.addOnScrollChangedListener {inlineVideos.forEach {if(!inlineVisible(it))it.pause()}}
+  root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(4);bottomMargin=dp(4)});attachMarketContext(root);pinnedMessages=JSONArray();pinnedMessageSignature="";pinnedMessageBar=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;visibility=View.GONE};root.addView(pinnedMessageBar,LinearLayout.LayoutParams(-1,-2));chatConnectionError=false;chatFeedback=text("",12f).apply {visibility=View.GONE;setTextColor(muted);maxLines=2;accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE};root.addView(chatFeedback,LinearLayout.LayoutParams(-1,-2));chatDateSignature="";chatDatedRows=emptyList();chatDateHeader=text("",11f).apply {gravity=Gravity.CENTER;visibility=View.GONE;setPadding(dp(8),dp(3),dp(8),dp(3));setTextColor(muted)};root.addView(chatDateHeader,LinearLayout.LayoutParams(-1,dp(24)));scroller=LatestMessageScrollView(this).apply {alpha=0f};messages=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroller!!.addView(messages);scroller!!.background=boundary().apply {setColor(Color.TRANSPARENT)};scroller!!.setPadding(dp(6),0,dp(6),0);scroller!!.viewTreeObserver.addOnScrollChangedListener {inlineVideos.forEach {if(!inlineVisible(it))it.pause()};paintChatDate()}
   scroller!!.tag="chat-reading-surface";scroller!!.background=boundary().apply {setColor((surface and 0x00ffffff) or (194 shl 24))}
   root.addView(scroller,LinearLayout.LayoutParams(-1,0,1f))
   val iconWidth=if(resources.configuration.screenWidthDp<600)28 else 36
@@ -518,14 +530,163 @@ class MainActivity:ComponentActivity(){
   fetchMessages()
  }
  private fun fetchMessages(){val gen=generation;if((fetching && fetchingGeneration==gen) || peer.isEmpty())return;fetching=true;fetchingGeneration=gen;val target=peer;val cursor=after
-  net.execute {try{val response=api().request("/messages?peer=${URLEncoder.encode(target,"UTF-8")}&after=$cursor");val list=response.getJSONArray("messages");if(cursor==0L){var batch=list;var nextCursor=0L;while(batch.length()==100 && generation==gen){for(i in 0 until batch.length())nextCursor=maxOf(nextCursor,batch.getJSONObject(i).getLong("id"));batch=api().request("/messages?peer=${URLEncoder.encode(target,"UTF-8")}&after=$nextCursor").getJSONArray("messages");for(i in 0 until batch.length())list.put(batch.getJSONObject(i))}};main.post {if(screen=="chat"&&generation==gen){val entry=firstMessageLoad;firstMessageLoad=false;val unread=response.optInt("unread_count");for(i in 0 until list.length()){val msg=list.getJSONObject(i);if(entry && !unreadShown && unread>0 && msg.getString("recipient")==prefs.getString("id","") && msg.optLong("read_at")==0L){unreadShown=true;messages?.addView(text("──── $unread unread message${if(unread==1)"" else "s"} ────",13f).apply {gravity=Gravity.CENTER;setTextColor(muted)})};after=maxOf(after,msg.getLong("id"));addMessage(msg)};response.optJSONArray("deleted_ids")?.let {ids->for(j in 0 until ids.length())applyDeletedMessage(ids.getLong(j))};refreshReceipts(target,gen);if(entry){val destination=notificationMessageId;notificationMessageId=0;val row=messageViews[destination];if(row!=null){(scroller as? LatestMessageScrollView)?.revealMessage(row);row.foreground=GradientDrawable().apply {setColor(Color.TRANSPARENT);setStroke(dp(2),accentText);cornerRadius=dp(14).toFloat()};row.postDelayed({row.foreground=null},2200)}else revealLatestChat()};if(list.length()>0){val received=org.json.JSONArray();for(i in 0 until list.length()){val m=list.getJSONObject(i);if(m.getString("recipient")==prefs.getString("id",""))received.put(m.getLong("id"))};if(received.length()>0)async {api().request("/delivered",JSONObject().put("ids",received))};if(foreground){val through=after;async {api().request("/read",JSONObject().put("peer",target).put("through",through))};getSystemService(android.app.NotificationManager::class.java).cancel(target.hashCode())}}}}}catch(e:Exception){main.post {if(screen=="chat"&&generation==gen){scroller?.alpha=1f;status?.text="Connection lost · retrying. ${if(enabled)"GuardianLab remains enabled." else "GuardianLab is off."}"}}}finally{main.post {if(fetchingGeneration==gen)fetching=false}}}
+  net.execute {try{val response=api().request("/messages?peer=${URLEncoder.encode(target,"UTF-8")}&after=$cursor");val list=response.getJSONArray("messages");if(cursor==0L){var batch=list;var nextCursor=0L;while(batch.length()==100 && generation==gen){for(i in 0 until batch.length())nextCursor=maxOf(nextCursor,batch.getJSONObject(i).getLong("id"));batch=api().request("/messages?peer=${URLEncoder.encode(target,"UTF-8")}&after=$nextCursor").getJSONArray("messages");for(i in 0 until batch.length())list.put(batch.getJSONObject(i))}};main.post {if(screen=="chat"&&generation==gen){if(chatConnectionError){chatConnectionError=false;chatFeedback?.text="";chatFeedback?.visibility=View.GONE};val entry=firstMessageLoad;firstMessageLoad=false;val unread=response.optInt("unread_count");for(i in 0 until list.length()){val msg=list.getJSONObject(i);if(entry && !unreadShown && unread>0 && msg.getString("recipient")==prefs.getString("id","") && msg.optLong("read_at")==0L){unreadShown=true;messages?.addView(text("──── $unread unread message${if(unread==1)"" else "s"} ────",13f).apply {gravity=Gravity.CENTER;setTextColor(muted)})};after=maxOf(after,msg.getLong("id"));addMessage(msg)};paintSharedPins(response.optJSONArray("pins")?:JSONArray());syncChatDateDividers();response.optJSONArray("deleted_ids")?.let {ids->for(j in 0 until ids.length())applyDeletedMessage(ids.getLong(j))};refreshReceipts(target,gen);if(entry){val destination=notificationMessageId;notificationMessageId=0;val row=messageViews[destination];if(row!=null){(scroller as? LatestMessageScrollView)?.revealMessage(row);row.foreground=GradientDrawable().apply {setColor(Color.TRANSPARENT);setStroke(dp(2),accentText);cornerRadius=dp(14).toFloat()};row.postDelayed({row.foreground=null},2200)}else revealLatestChat()};if(list.length()>0){val received=org.json.JSONArray();for(i in 0 until list.length()){val m=list.getJSONObject(i);if(m.getString("recipient")==prefs.getString("id",""))received.put(m.getLong("id"))};if(received.length()>0)async {api().request("/delivered",JSONObject().put("ids",received))};if(foreground){val through=after;async {api().request("/read",JSONObject().put("peer",target).put("through",through))};getSystemService(android.app.NotificationManager::class.java).cancel(target.hashCode())}}}}}catch(e:Exception){main.post {if(screen=="chat"&&generation==gen){scroller?.alpha=1f;chatConnectionError=true;chatFeedback?.text="Connection lost · retrying";chatFeedback?.visibility=View.VISIBLE}}}finally{main.post {if(fetchingGeneration==gen)fetching=false}}}
  }
  private val messageViews=mutableMapOf<Long,View>();private val messageValues=mutableMapOf<Long,JSONObject>()
  private val messageTimes=java.util.WeakHashMap<View,Long>()
+ /** Show incoming requests without opening a chat or creating read receipts.
+  * @return Unit. Transport/permission errors stay inside the existing-theme dialog.
+  * Preview payloads contain text/reaction labels, never private Vibe media.
+  */
+ private fun showMessageRequests(){
+  val gen=generation;val client=api();val body=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(8),dp(12),dp(8))}
+  val scroll=ScrollView(this);scroll.addView(body)
+  val dialog=android.app.AlertDialog.Builder(this).setTitle("Message requests").setView(scroll).setNegativeButton("Close",null).create()
+  fun current()=generation==gen&&prefs.getString("token","")==client.token&&dialog.isShowing
+  fun load(){
+   body.removeAllViews();body.addView(text("Loading requests…",12f))
+   net.execute {try{val users=client.request("/social/message_requests").getJSONArray("users");main.post {if(current()){
+    body.removeAllViews();if(users.length()==0)body.addView(text("No message requests",13f))
+    for(i in 0 until users.length()){
+     val user=users.getJSONObject(i);val target=user.getString("id")
+     val card=LinearLayout(this@MainActivity).apply {orientation=LinearLayout.VERTICAL;setPadding(0,dp(8),0,dp(8))}
+     card.addView(text(user.getString("name")+" · @"+user.getString("nickname"),14f))
+     val previews=user.optJSONArray("previews")?:JSONArray()
+     if(previews.length()==0)card.addView(text("Wants to start a conversation",12f))
+     for(j in 0 until previews.length())card.addView(text(previews.getJSONObject(j).getString("text"),12f))
+     val feedback=text("",12f);card.addView(feedback)
+     val actions=LinearLayout(this@MainActivity).apply {orientation=LinearLayout.VERTICAL}
+     var deciding=false
+     for((label,action) in listOf("Accept" to "message_accept","Decline" to "message_decline","Decline & Block" to "message_decline_block")){
+      actions.addView(button(label){if(!current()||deciding)return@button;deciding=true
+       net.execute {try{client.request("/social/"+action,JSONObject().put("target",target));main.post {if(current())load()}}catch(error:Exception){main.post {if(current())feedback.text=error.message}}finally{main.post {deciding=false}}}
+      }.apply {textSize=12f},LinearLayout.LayoutParams(-1,dp(38)))
+     }
+     actions.addView(button("Report"){reportMessageRequest(target,client){if(current())feedback.text="Report submitted for review"}}.apply {textSize=12f},LinearLayout.LayoutParams(-1,dp(38)))
+     card.addView(actions);body.addView(card);body.addView(View(this@MainActivity).apply {setBackgroundColor(rule)},LinearLayout.LayoutParams(-1,dp(1)))
+    };applyAppearance(body)
+   }}}catch(error:Exception){main.post {if(current()){body.removeAllViews();body.addView(text(error.message?:"Could not load requests",12f));body.addView(button("Retry"){load()})}}}}
+  }
+  dialog.show();load()
+ }
+ /** Submit a recipient-owned report without implicitly declining or blocking.
+  * @param target Request sender. @param client Existing authenticated client.
+  * @param accepted UI callback after a persisted report, not a moderation decision.
+  * @return Unit. Validation/transport errors remain visible with retry.
+  */
+ private fun reportMessageRequest(target:String,client:ChatApi,accepted:()->Unit){
+  val panel=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(8),dp(12),dp(8))}
+  val reason=field("Explain the report").apply {setSingleLine(false);maxLines=5;filters=arrayOf(android.text.InputFilter.LengthFilter(1000))};val feedback=text("",12f)
+  panel.addView(reason);panel.addView(feedback)
+  val dialog=android.app.AlertDialog.Builder(this).setTitle("Report message request").setView(panel).setNegativeButton("Cancel",null).setPositiveButton("Submit report",null).create()
+  var original="";var key=UUID.randomUUID().toString()
+  dialog.setOnShowListener {val submit=dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);submit.setOnClickListener {
+   if(client.token!=prefs.getString("token","")||!submit.isEnabled)return@setOnClickListener
+   val value=reason.text.toString();if(original!=value){original=value;key=UUID.randomUUID().toString()};val retryKey=key;submit.isEnabled=false
+   net.execute {try{client.request("/social/message_report",JSONObject().put("target",target).put("reason",value).put("client_id",retryKey));main.post {if(dialog.isShowing){accepted();dialog.dismiss()}}}catch(error:Exception){main.post {if(dialog.isShowing)feedback.text=error.message}}finally{main.post {submit.isEnabled=true}}}
+  }};dialog.show();applyAppearance(panel)
+ }
+ private var pinnedMessages=JSONArray()
+ private var pinnedMessageBar:LinearLayout?=null
+ private var pinnedMessageSignature=""
+ /** Draw shared authorized previews under the peer header.
+  * @param values Fresh safe previews from the current conversation response.
+  * @return Unit. No media is loaded and no read receipts are changed.
+  * Unchanged polling leaves focus and layout intact; view errors propagate.
+  */
+ private fun paintSharedPins(values:JSONArray){
+  val bar=pinnedMessageBar?:return;val signature=values.toString()
+  if(signature==pinnedMessageSignature)return
+  pinnedMessageSignature=signature;pinnedMessages=values;bar.removeAllViews();bar.visibility=if(values.length()==0)View.GONE else View.VISIBLE
+  if(values.length()==0)return
+  val first=values.getJSONObject(0)
+  bar.addView(button("Pinned · "+first.getString("preview")){visitPinnedMessage(first.getLong("id"))}.apply {textSize=12f;maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END},LinearLayout.LayoutParams(0,dp(36),1f))
+  bar.addView(button("All pins (${values.length()})"){showPinnedMessages()}.apply {textSize=12f},LinearLayout.LayoutParams(-2,dp(36)))
+ }
+ /** Jump to an existing message without opening protected media.
+  * @param id Existing server message ID.
+  * @return Unit. Inaccessible/stale rows produce inline feedback; view errors propagate.
+  */
+ private fun visitPinnedMessage(id:Long){
+  val row=messageViews[id];val value=messageValues[id]
+  if(row==null||value==null||value.optInt("deleted_all")==1){toast("This pinned message is unavailable. Reopen the conversation to refresh.");return}
+  (scroller as? LatestMessageScrollView)?.revealMessage(row)
+  row.foreground=GradientDrawable().apply {setColor(Color.TRANSPARENT);setStroke(dp(2),accentText);cornerRadius=dp(14).toFloat()}
+  row.postDelayed({row.foreground=null},1600)
+ }
+ /** Display all shared pins, retaining existing conversation navigation.
+  * @return Unit. Empty lists are harmless; Android dialog errors propagate.
+  */
+ private fun showPinnedMessages(){
+  val values=pinnedMessages;val labels=(0 until values.length()).map {val p=values.getJSONObject(it);p.getString("name")+" · "+p.getString("preview")}.toTypedArray()
+  android.app.AlertDialog.Builder(this).setTitle("Pinned messages").setItems(labels){_,index->visitPinnedMessage(values.getJSONObject(index).getLong("id"))}.setNegativeButton("Close",null).show()
+ }
+ /** Change a shared pin with server authorization and ignore stale responses.
+  * @param msg Original message. @param pin Desired shared pin state.
+  * @return Unit. Transport/permission failures use existing inline error feedback.
+  */
+ private fun setMessagePin(msg:JSONObject,pin:Boolean){
+  val gen=generation;val target=peer;val senderApi=api()
+  net.execute {try{val response=senderApi.request("/messages/pin",JSONObject().put("message_id",msg.getLong("id")).put("pinned",pin));main.post {if(screen=="chat"&&generation==gen&&peer==target)paintSharedPins(response.getJSONArray("pins"))}}catch(error:Exception){main.post {if(screen=="chat"&&generation==gen)toast(error.message?:"Could not change this pin")}}}
+ }
+ private var chatDateHeader:TextView?=null
+ private var chatDateSignature=""
+ private var chatDatedRows:List<View> = emptyList()
+ /**
+  * Reconcile local-date dividers once after a batch, leaving message rows flat.
+  * @return Unit. Invalid timestamps are ignored; Android view errors propagate.
+  * Preserves the first visible row when reading history and avoids repeated work
+  * on unchanged polling responses. It does not touch messages, reads or gestures.
+  */
+ private fun syncChatDateDividers(){
+  val list=messages?:return;val scroll=scroller?:return
+  val rows=(0 until list.childCount).map {list.getChildAt(it)}.filter {ChatDates.day(messageTimes[it]?:0)!=null}
+  val signature=ChatDates.day(System.currentTimeMillis()).toString()+"|"+rows.joinToString("|"){System.identityHashCode(it).toString()+":"+ChatDates.day(messageTimes[it]?:0)}
+  if(signature==chatDateSignature){paintChatDate();return};chatDateSignature=signature
+  val oldTop=scroll.scrollY;val anchor=rows.firstOrNull {it.bottom>oldTop};val offset=anchor?.let {it.top-oldTop}?:0
+  val atBottom=list.height-scroll.height-scroll.scrollY<dp(36)
+  for(i in list.childCount-1 downTo 0)if(list.getChildAt(i).tag=="chat-date-divider")list.removeViewAt(i)
+  var previous:java.time.LocalDate?=null
+  for(row in rows){val stamp=messageTimes[row]?:continue;val day=ChatDates.day(stamp)?:continue;if(day==previous)continue;previous=day
+   list.addView(text(ChatDates.label(stamp),11f).apply {tag="chat-date-divider";gravity=Gravity.CENTER;setTextColor(muted);setPadding(dp(6),dp(4),dp(6),dp(4));contentDescription="Messages "+text},list.indexOfChild(row),LinearLayout.LayoutParams(-1,-2))
+  }
+  chatDatedRows=rows;chatDateHeader?.visibility=if(rows.isEmpty())View.GONE else View.VISIBLE
+  val gen=generation;list.post {if(screen=="chat"&&generation==gen){if(!atBottom&&anchor?.parent===list&&scroll.scrollY==oldTop)scroll.scrollTo(0,maxOf(0,anchor.top-offset));paintChatDate()}}
+ }
+ /**
+  * Keep the currently visible date beneath the conversation header.
+  * @return Unit. Empty/unlaid-out history hides the label; no scrolling is performed.
+  * Binary search uses current row bounds rather than message IDs or UTC dates.
+  */
+ private fun paintChatDate(){
+  val scroll=scroller?:return;val label=chatDateHeader?:return
+  if(screen!="chat"||chatDatedRows.isEmpty()){label.visibility=View.GONE;return}
+  var low=0;var high=chatDatedRows.lastIndex
+  while(low<high){val middle=(low+high)/2;if(chatDatedRows[middle].bottom<=scroll.scrollY)low=middle+1 else high=middle}
+  val row=chatDatedRows[low];label.text=ChatDates.label(messageTimes[row]?:0);label.visibility=if(label.text.isEmpty())View.GONE else View.VISIBLE
+ }
+
+ /**
+  * Format message text without changing persisted bytes or bubble alignment.
+  * @param box Existing bubble container.
+  * @param raw Original text, including legacy Vibe headings.
+  * @param own Whether the current account sent the message.
+  * @return Unit. DOM/network work is not performed; Android view failures propagate.
+  */
+ private fun addMessageText(box:LinearLayout,raw:String,own:Boolean){
+  val parts=MessageTextPresentation.parts(raw)
+  parts.first?.let {label->
+   val heading=android.text.SpannableString("↪ "+label)
+   heading.setSpan(android.text.style.AbsoluteSizeSpan(12,true),2,heading.length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+   heading.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.ITALIC),2,heading.length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+   box.addView(text("",16f).apply {text=heading;setPadding(0,0,0,0)})
+  }
+  box.addView(text(parts.second,if(MessageTextPresentation.emojiOnly(parts.second))24f else 16f).apply {typeface=bodyFont;if(own)setTextColor(Color.WHITE);setPadding(0,0,0,0);maxWidth=resources.displayMetrics.widthPixels-dp(80)})
+ }
  private fun addMessage(msg:JSONObject){
   if(msg.optString("kind")=="call"){val c=msg.optJSONObject("call")?:return;val row=text("${if(c.optBoolean("missed"))"↶" else if(c.optString("direction")=="outgoing")"↗" else "↙"} ${c.optString("label")}",12f).apply {gravity=Gravity.CENTER;setTextColor(if(c.optBoolean("missed"))tone(OrbitPalette.CORAL,OrbitPalette.LIGHT_CORAL) else muted)};val list=messages;val time=msg.optLong("time");if(list!=null){var at=list.childCount;for(i in 0 until list.childCount){if((messageTimes[list.getChildAt(i)]?:Long.MIN_VALUE)>time){at=i;if(i>0&&list.getChildAt(i-1).javaClass==View::class.java)at=i-1;break}};messageTimes[row]=time;list.addView(row,at)};return}
   val own=msg.getString("sender")==prefs.getString("id","");val client=msg.optString("client_id");if(own && !msg.optBoolean("pending")){pendingRows.remove(client)?.let {messages?.removeView(it)};pendingDots.remove(client)};val outer=LinearLayout(this).apply {tag=msg.getString("sender");orientation=LinearLayout.VERTICAL;gravity=if(own)Gravity.END else Gravity.START};val box=LinearLayout(this).apply {tag="message-body";orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(6),dp(10),dp(6));background=GradientDrawable().apply {setColor(if(own)sentPaper else receivedPaper);cornerRadius=dp(18).toFloat()}}
-  outer.addView(text(if(own)"You" else peerName,12f).apply {typeface=android.graphics.Typeface.create(bodyFont,android.graphics.Typeface.ITALIC);setTextColor(muted);gravity=if(own)Gravity.END else Gravity.START;tag="sender-label"},LinearLayout.LayoutParams(-2,-2).apply {gravity=if(own)Gravity.END else Gravity.START});msg.optJSONObject("reply")?.let {box.addView(text(it.optString("name")+": "+it.optString("text"),11f).apply {tag="reply-${it.optLong("id")}";setPadding(dp(5),dp(3),dp(5),dp(3));maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(if(own)Color.LTGRAY else muted)})};val content=msg.optString("text");if(content.isNotBlank())box.addView(text(content,16f).apply {if(own)setTextColor(Color.WHITE);setPadding(0,0,0,0);maxWidth=resources.displayMetrics.widthPixels-dp(80)})
+  outer.addView(text(if(own)"You" else peerName,12f).apply {typeface=android.graphics.Typeface.create(bodyFont,android.graphics.Typeface.ITALIC);setTextColor(muted);gravity=if(own)Gravity.END else Gravity.START;tag="sender-label"},LinearLayout.LayoutParams(-2,-2).apply {gravity=if(own)Gravity.END else Gravity.START});msg.optJSONObject("reply")?.let {box.addView(text(it.optString("name")+": "+it.optString("text"),11f).apply {tag="reply-${it.optLong("id")}";setPadding(dp(5),dp(3),dp(5),dp(3));maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(if(own)Color.LTGRAY else muted)})};val content=msg.optString("text");if(content.isNotBlank())addMessageText(box,content,own)
   if(msg.optInt("protected_media")==1){if(own)box.addView(text("Protected media sent",15f))else{val id=msg.getLong("id");val line=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL};val ready=sealedStore().exists("protected-$id");val meter=DownloadRing(this,true).apply {visibility=if(ready)View.GONE else View.VISIBLE};val label=text(if(ready)"🔒 Open protected media"else "↓ Download protected media",14f);line.addView(meter,LinearLayout.LayoutParams(dp(36),dp(36)));line.addView(label);meter.setOnClickListener {line.performClick()};label.setOnClickListener {line.performClick()};line.setOnClickListener {if(!downloadingProtected.contains(id)){if(sealedStore().exists("protected-$id"))openProtected(msg)else downloadProtected(msg,meter,label)}};box.addView(line)}}
 
   if(msg.optInt("view_once")==1){val used=msg.optInt("opened")==1;if(used)sealedStore().remove("once-${msg.getLong("id")}");if(own)box.addView(text("View-once content sent",15f))else{val line=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL};val meter=DownloadRing(this,true);val ready=sealedStore().exists("once-${msg.getLong("id")}");val label=text(if(used)"View once · opened" else if(ready)"Open protected view once"else "↓ Download view once",14f);if(ready)meter.visibility=View.GONE;line.addView(meter,LinearLayout.LayoutParams(dp(36),dp(36)));line.addView(label);meter.setOnClickListener {line.performClick()};label.setOnClickListener {line.performClick()};line.isEnabled=!used;line.setOnClickListener {if(!used&&!downloadingOnce.contains(msg.getLong("id"))){if(sealedStore().exists("once-${msg.getLong("id")}"))openOnce(msg)else downloadOnce(msg,meter,label)}};box.addView(line)}}
@@ -550,16 +711,77 @@ class MainActivity:ComponentActivity(){
   mediaNet.execute {try{val f=localAttachment(msg);if(!f.exists())api().download(msg.getString("fileid"),f);val bitmap=if(msg.optString("mime").startsWith("video/")){val retriever=android.media.MediaMetadataRetriever();try{retriever.setDataSource(f.absolutePath);retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,440,300)}finally{retriever.release()}}else{val options=BitmapFactory.Options().apply {inJustDecodeBounds=true};BitmapFactory.decodeFile(f.absolutePath,options);options.inJustDecodeBounds=false;options.inSampleSize=maxOf(1,maxOf(options.outWidth,options.outHeight)/440);BitmapFactory.decodeFile(f.absolutePath,options)};main.post {if(gen==generation && screen=="chat")image.setImageBitmap(bitmap)}}catch(_:Exception){main.post {if(gen==generation)box.removeView(image)}}}
  }
  private fun readLimited(uri:Uri,limit:Int):ByteArray {val input=contentResolver.openInputStream(uri)?:error("Could not read file");return input.use {val out=java.io.ByteArrayOutputStream();val buffer=ByteArray(65536);while(true){val n=it.read(buffer);if(n<0)break;check(out.size()+n<=limit){"Video limit is 30 MB; other files 8 MB"};out.write(buffer,0,n)};out.toByteArray()}}
+ /**
+  * Stage one visible message and retry it with the same backend idempotency key.
+  * @param content Text/caption.
+  * @param uri Original document URI, if any.
+  * @param file Existing private capture file; deleted only on success or discard.
+  * @param filename Attachment label.
+  * @param mime Declared existing attachment type.
+  * @return Unit. Validation/transport errors remain on the message with Retry.
+  * Retries re-read the original but reject changed bytes; no protected/view-once
+  * content is copied into an ordinary persistent outbox or attachment cache.
+  */
  private fun send(content:String="",uri:Uri?=null,file:File?=null,filename:String?=null,mime:String?=null){
-  if(sending || peer.isEmpty())return;sending=true;sendButton?.isEnabled=false;val senderApi=api();val sentStore=sentAttachments();val target=peer;val gen=generation;val id=UUID.randomUUID().toString();val reply=replyTarget;val once=onceChoice?.isChecked==true
-  addMessage(JSONObject().put("sender",prefs.getString("id","")).put("text",if(once)"" else content.ifEmpty {filename?:"Attachment"}).put("id",-1).put("client_id",id).put("time",System.currentTimeMillis()).put("view_once",if(once)1 else 0).put("pending",true).apply {reply?.let {put("reply",JSONObject().put("name",if(it.getString("sender")==prefs.getString("id",""))"You" else peerName).put("text",replyText(it)))}});revealLatestChat();scroller?.requestLayout()
-  async {try{
-   var uploadData:ByteArray?=null;val body=JSONObject().put("peer",target).put("text",content).put("client_id",id).put("view_once",once);reply?.let {body.put("reply_to",it.getLong("id"))}
-   if(uri!=null || file!=null){val limit=if(mime?.startsWith("video/")==true)30*1024*1024 else 8*1024*1024;val data=if(uri!=null)readLimited(uri,limit) else file!!.readBytes();check(data.size<=limit){"Video limit is 30 MB; other files 8 MB"};uploadData=data;body.put("data",android.util.Base64.encodeToString(data,android.util.Base64.NO_WRAP)).put("filename",filename?:"attachment").put("mime",mime?:"application/octet-stream")}
-   uploadSentMessage(senderApi,sentStore,body,uploadData);main.post {if(generation==gen){revealLatestChat();pendingDots[id]?.let {paintReceipt(it,JSONObject(),false)};if(draft?.text.toString().trim()==content)draft?.text?.clear();if(replyTarget===reply)clearReply();onceChoice?.isChecked=false;toast("Sent");revealLatestChat();fetchMessages()}}
-  }catch(e:Exception){main.post {pendingRows.remove(id)?.let {messages?.removeView(it)};groupSenderLabels();pendingDots.remove(id)};throw e}finally{file?.delete();main.post {sending=false;sendButton?.isEnabled=true}}}
+  if(sending||peer.isEmpty())return
+  val senderApi=api();val sentStore=sentAttachments();val target=peer;val gen=generation
+  val id=UUID.randomUUID().toString();val reply=replyTarget;val once=onceChoice?.isChecked==true
+  var completed=false;var fingerprint:String?=null
+  addMessage(JSONObject().put("sender",prefs.getString("id","")).put("text",if(once)"" else content.ifEmpty {filename?:"Attachment"}).put("id",-1).put("client_id",id).put("time",System.currentTimeMillis()).put("view_once",if(once)1 else 0).put("pending",true).apply {reply?.let {put("reply",JSONObject().put("name",if(it.getString("sender")==prefs.getString("id",""))"You" else peerName).put("text",replyText(it)))}})
+  syncChatDateDividers();revealLatestChat()
+  /** Attempt the original immutable action. Returns Unit; failures render inline. */
+  fun attempt(){
+   if(sending||completed)return
+   if(senderApi.token!=prefs.getString("token","")){toast("Reopen the original account to retry this message");return}
+   sending=true;sendButton?.isEnabled=false
+   val row=pendingRows[id] as? LinearLayout
+   row?.findViewWithTag<View>("send-failure")?.let {row.removeView(it)}
+   pendingDots[id]?.let {paintReceipt(it,JSONObject(),true)}
+   net.execute {
+    try{
+     var uploadData:ByteArray?=null
+     val body=JSONObject().put("peer",target).put("text",content).put("client_id",id).put("view_once",once)
+     reply?.let {body.put("reply_to",it.getLong("id"))}
+     if(uri!=null||file!=null){
+      val limit=if(mime?.startsWith("video/")==true)30*1024*1024 else 8*1024*1024
+      val data=if(uri!=null)readLimited(uri,limit) else file!!.readBytes()
+      check(data.size<=limit){"Video limit is 30 MB; other files 8 MB"}
+      val digest=java.security.MessageDigest.getInstance("SHA-256").digest(data).joinToString(""){"%02x".format(it)}
+      check(fingerprint==null||fingerprint==digest){"The original file changed. Attach it again instead of retrying."}
+      fingerprint=digest;uploadData=data
+      body.put("data",android.util.Base64.encodeToString(data,android.util.Base64.NO_WRAP)).put("filename",filename?:"attachment").put("mime",mime?:"application/octet-stream")
+     }
+     uploadSentMessage(senderApi,sentStore,body,uploadData);completed=true;file?.delete()
+     main.post {if(screen=="chat"&&generation==gen){
+      pendingDots[id]?.let {paintReceipt(it,JSONObject(),false)}
+      if(draft?.text.toString().trim()==content)draft?.text?.clear()
+      if(replyTarget===reply)clearReply();onceChoice?.isChecked=false
+      revealLatestChat();fetchMessages()
+     }}
+    }catch(error:Exception){
+     main.post {if(screen=="chat"&&generation==gen){
+      pendingDots[id]?.let {paintReceipt(it,JSONObject().put("failed",true))}
+      val failed=pendingRows[id] as? LinearLayout
+      if(failed!=null&&failed.findViewWithTag<View>("send-failure")==null){
+       val actions=LinearLayout(this@MainActivity).apply {orientation=LinearLayout.VERTICAL;tag="send-failure"}
+       actions.addView(text("Not sent · "+(error.message?:"Connection unavailable"),11f).apply {setTextColor(muted)})
+       actions.addView(button("Retry"){attempt()}.apply {textSize=12f})
+       actions.addView(button("Remove unsent preview"){pendingRows.remove(id)?.let {messages?.removeView(it)};pendingDots.remove(id);file?.delete();syncChatDateDividers();groupSenderLabels()}.apply {textSize=12f})
+       failed.addView(actions)
+      }
+     }}
+    }finally{main.post {sending=false;if(screen=="chat"&&generation==gen)sendButton?.isEnabled=true}}
+   }
+  }
+  attempt()
  }
- private fun paintReceipt(dot:View,m:JSONObject,sending:Boolean=false){val state=if(sending)"sending" else if(m.optLong("read_at")>0)"read" else if(m.optLong("delivered_at")>0)"delivered" else "sent";val color=when(state){"read"->accentText;"delivered"->tone(OrbitPalette.VIOLET_TEXT,OrbitPalette.LIGHT_VIOLET);else->Color.WHITE};dot.contentDescription=state;dot.background=GradientDrawable().apply {shape=GradientDrawable.OVAL;setColor(if(sending)Color.TRANSPARENT else color);setStroke(dp(1),if(bright && state in listOf("sent","sending"))Color.GRAY else color)}}
+ /** Paint one existing receipt indicator; no persisted delivery state changes.
+  * @param dot Existing indicator view.
+  * @param m Server receipt or local failure marker.
+  * @param sending Whether this attempt is in flight.
+  * @return Unit. Android view failures propagate.
+  */
+ private fun paintReceipt(dot:View,m:JSONObject,sending:Boolean=false){val state=if(m.optBoolean("failed"))"failed" else if(sending)"sending" else if(m.optLong("read_at")>0)"read" else if(m.optLong("delivered_at")>0)"delivered" else "sent";val color=when(state){"failed"->tone(OrbitPalette.CORAL,OrbitPalette.LIGHT_CORAL);"read"->accentText;"delivered"->tone(OrbitPalette.VIOLET_TEXT,OrbitPalette.LIGHT_VIOLET);else->Color.WHITE};dot.contentDescription=state;dot.background=GradientDrawable().apply {shape=GradientDrawable.OVAL;setColor(if(sending)Color.TRANSPARENT else color);setStroke(dp(1),if(bright && state in listOf("sent","sending"))Color.GRAY else color)}}
  private fun refreshReceipts(target:String,gen:Int){async {val receipts=api().request("/receipts?peer=$target").getJSONArray("receipts");main.post {if(screen=="chat"&&generation==gen)for(i in 0 until receipts.length()){val r=receipts.getJSONObject(i);receiptDots[r.getLong("id")]?.let {paintReceipt(it,r)}}}}}
  private fun onceToggle(checked:Boolean,change:(Boolean)->Unit)=OnceToggle(this).apply {foreground=OrbitPalette.focus(this@MainActivity,bright);setPair(Color.parseColor(OrbitPalette.CYAN),Color.parseColor(OrbitPalette.BG),inputPaper,accentText);isChecked=checked;setOnCheckedChangeListener {_,value->contentDescription=if(value)"View once enabled" else "Send as view once";invalidate();change(value)}}
  private fun clearPreview(){pendingSend=null;val cleanup=previewCleanup;previewCleanup=null;cleanup?.invoke()}
@@ -774,7 +996,7 @@ if(video!=null)row.addView(control("↶10","Skip backward 10 seconds"){move(posi
 
  private fun forwardMessage(msg:JSONObject){async {val users=api().request("/users?all=1").getJSONArray("users");main.post {val dialog=android.app.Dialog(this);val panel=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(24),dp(12),dp(16));setBackgroundColor(paper)};val heading=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL};heading.addView(text("‹",32f).apply {setTextColor(accentText);contentDescription="Back";setOnClickListener {dialog.dismiss()}},LinearLayout.LayoutParams(dp(44),dp(48)));heading.addView(text("Forward to",24f));panel.addView(heading);val scroll=ScrollView(this);val list=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroll.addView(list);panel.addView(scroll,LinearLayout.LayoutParams(-1,0,1f));val selected=linkedMapOf<String,JSONObject>();val next=button("Next"){};next.isEnabled=false;if(users.length()==0)list.addView(text("Add a contact first"));for(position in 0 until users.length()){val contact=users.getJSONObject(position);val row=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(8),dp(12),dp(8));background=GradientDrawable().apply {setColor(surface);cornerRadius=dp(14).toFloat()};clipToOutline=true};val photo=profileIcon(contact.getString("id"),contact.getString("name"));photo.isClickable=false;photo.isFocusable=false;row.addView(photo,LinearLayout.LayoutParams(dp(44),dp(44)));row.addView(text(contact.getString("name")+"\n"+presenceText(contact),13f).apply {maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.MARQUEE;isSingleLine=true;isSelected=true;marqueeRepeatLimit=-1},LinearLayout.LayoutParams(0,-2,1f).apply {leftMargin=dp(12)});row.setOnTouchListener {v,e->if(e.actionMasked==MotionEvent.ACTION_DOWN)pressSweep(v);false};val check=text("",14f).apply {setPadding(0,0,0,0);gravity=Gravity.CENTER;background=GradientDrawable().apply {shape=GradientDrawable.OVAL;setColor(Color.TRANSPARENT);setStroke(dp(1),muted)}};row.addView(check,LinearLayout.LayoutParams(dp(24),dp(24)));row.setOnClickListener {val id=contact.getString("id");if(selected.containsKey(id))selected.remove(id)else selected[id]=contact;check.text=if(selected.containsKey(id))"✓"else "";check.background=GradientDrawable().apply {shape=GradientDrawable.OVAL;setColor(if(selected.containsKey(id))accent else Color.TRANSPARENT);setStroke(dp(1),muted)};next.isEnabled=selected.isNotEmpty()};list.addView(row,LinearLayout.LayoutParams(-1,dp(56)).apply {bottomMargin=dp(5)})};panel.addView(next);next.setOnClickListener {val targets=selected.values.toList();if(targets.isNotEmpty()){next.isEnabled=false;val hasFile=msg.optString("fileid").let {it.isNotBlank()&&it!="null"};async {var copy:File?=null;if(hasFile){val original=localAttachment(msg);if(!original.exists())api().download(msg.getString("fileid"),original);copy=File(cacheDir,"forward-${UUID.randomUUID()}-${msg.getString("filename")}");original.copyTo(copy!!,true)};main.post {dialog.dismiss();peer=targets[0].getString("id");peerName=targets[0].getString("name");showChat();onceChoice?.isChecked=false;draft?.setText(msg.optString("text"));if(copy!=null)previewSend(file=copy,filename=msg.getString("filename"),mime=msg.optString("mime"),forwardPeers=targets)else forwardTextPreview(targets,msg.optString("text"))}}}};applyAppearance(panel);dialog.setContentView(panel);dialog.show();dialog.window?.setLayout(-1,-1)}}}
  private fun pressSweep(view:View){val shine=object:android.graphics.drawable.Drawable(){var position=-view.width.toFloat();val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);override fun draw(c:android.graphics.Canvas){val w=view.width*.4f;paint.shader=android.graphics.LinearGradient(position,0f,position+w,0f,intArrayOf(Color.TRANSPARENT,Color.argb(100,255,255,255),Color.TRANSPARENT),null,android.graphics.Shader.TileMode.CLAMP);c.save();c.clipRect(bounds);c.drawRect(position,0f,position+w,view.height.toFloat(),paint);c.restore()};override fun setAlpha(a:Int){};override fun setColorFilter(f:android.graphics.ColorFilter?){};override fun getOpacity()=android.graphics.PixelFormat.TRANSLUCENT};shine.setBounds(0,0,view.width,view.height);view.overlay.add(shine);android.animation.ValueAnimator.ofFloat(-view.width.toFloat(),view.width*1.5f).apply {duration=450;addUpdateListener {shine.position=it.animatedValue as Float;shine.invalidateSelf()};addListener(object:android.animation.AnimatorListenerAdapter(){override fun onAnimationEnd(a:android.animation.Animator){view.overlay.remove(shine)}});start()}}
- private fun messageOptions(msg:JSONObject){val file=msg.optString("fileid").let {it.isNotBlank()&&it!="null"};val choices=mutableListOf<String>();if(msg.optInt("deleted_all")==0&&msg.optInt("view_once")==0&&msg.optInt("protected_media")==0){choices.add("Forward");if(file)choices.add("Save");choices.add("Copy")};choices.add("Delete");val panel=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(10),dp(12),dp(10))};panel.addView(text("Message options",16f));val dialog=android.app.AlertDialog.Builder(this).setView(panel).create();for(choice in choices){panel.addView(button(choice){dialog.dismiss();when(choice){"Forward"->forwardMessage(msg);"Delete"->confirmDeleteMessage(msg);"Copy"->if(!file){getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Message",msg.optString("text")));toast("Copied")}else mediaAction(msg,true);"Save"->mediaAction(msg,false)}}.apply {textSize=12f;isAllCaps=false;minimumHeight=0;minimumWidth=0;setPadding(dp(10),0,dp(10),0);gravity=Gravity.START or Gravity.CENTER_VERTICAL;backgroundTintList=null;background=GradientDrawable().apply {setColor(surface);cornerRadius=dp(8).toFloat()};setTextColor(ink);setOnTouchListener {v,e->if(e.actionMasked==MotionEvent.ACTION_DOWN)pressSweep(v);false}},LinearLayout.LayoutParams(-1,dp(34)).apply {topMargin=dp(5)})};applyAppearance(panel);dialog.show();dialog.window?.setLayout(dp(280),-2)}
+ private fun messageOptions(msg:JSONObject){val file=msg.optString("fileid").let {it.isNotBlank()&&it!="null"};val choices=mutableListOf<String>();if(screen=="chat"&&msg.optInt("deleted_all")==0)choices.add(if((0 until pinnedMessages.length()).any {pinnedMessages.getJSONObject(it).getLong("id")==msg.getLong("id")})"Unpin message" else "Pin message");if(msg.optInt("deleted_all")==0&&msg.optInt("view_once")==0&&msg.optInt("protected_media")==0){choices.add("Forward");if(file)choices.add("Save");choices.add("Copy")};choices.add("Delete");val panel=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(10),dp(12),dp(10))};panel.addView(text("Message options",16f));val dialog=android.app.AlertDialog.Builder(this).setView(panel).create();for(choice in choices){panel.addView(button(choice){dialog.dismiss();when(choice){"Pin message"->setMessagePin(msg,true);"Unpin message"->setMessagePin(msg,false);"Forward"->forwardMessage(msg);"Delete"->confirmDeleteMessage(msg);"Copy"->if(!file){getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Message",msg.optString("text")));toast("Copied")}else mediaAction(msg,true);"Save"->mediaAction(msg,false)}}.apply {textSize=12f;isAllCaps=false;minimumHeight=0;minimumWidth=0;setPadding(dp(10),0,dp(10),0);gravity=Gravity.START or Gravity.CENTER_VERTICAL;backgroundTintList=null;background=GradientDrawable().apply {setColor(surface);cornerRadius=dp(8).toFloat()};setTextColor(ink);setOnTouchListener {v,e->if(e.actionMasked==MotionEvent.ACTION_DOWN)pressSweep(v);false}},LinearLayout.LayoutParams(-1,dp(34)).apply {topMargin=dp(5)})};applyAppearance(panel);dialog.show();dialog.window?.setLayout(dp(280),-2)}
  private fun mediaAction(msg:JSONObject,copy:Boolean){async {val f=localAttachment(msg);if(!f.exists())api().download(msg.getString("fileid"),f);if(copy){val folder=File(cacheDir,"clipboard").apply {mkdirs()};val shared=File(folder,msg.getString("fileid")+"-"+msg.getString("filename"));f.copyTo(shared,true);val uri=androidx.core.content.FileProvider.getUriForFile(this,packageName+".clipboard",shared);main.post {getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newUri(contentResolver,"Media",uri));toast("Media copied")}}else main.post {exportFile=f;startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {type=msg.optString("mime","application/octet-stream");addCategory(Intent.CATEGORY_OPENABLE);putExtra(Intent.EXTRA_TITLE,msg.getString("filename"))},21)}}}
  private fun passwordRow(input:EditText):LinearLayout {var revealed=false;val row=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL};row.addView(input,LinearLayout.LayoutParams(0,-2,1f));val toggle=ImageButton(this).apply {setImageResource(R.drawable.ic_password_eye);imageTintList=android.content.res.ColorStateList.valueOf(accentText);background=null;contentDescription="Show password";setPadding(dp(6),dp(6),dp(6),dp(6));setOnClickListener {val start=input.selectionStart;val end=input.selectionEnd;revealed=!revealed;input.transformationMethod=if(revealed)null else android.text.method.PasswordTransformationMethod.getInstance();input.setSelection(start.coerceIn(0,input.length()),end.coerceIn(0,input.length()));contentDescription=if(revealed)"Hide password" else "Show password";imageTintList=android.content.res.ColorStateList.valueOf(if(revealed)Color.parseColor("#22d3ee") else accent)}};row.addView(toggle,LinearLayout.LayoutParams(dp(36),dp(36)));return row}
  private fun messageField()=object:EditText(this){override fun onTextContextMenuItem(id:Int):Boolean {if(id==android.R.id.paste||id==android.R.id.pasteAsPlainText){val clip=getSystemService(android.content.ClipboardManager::class.java).primaryClip;val uri=clip?.takeIf {it.itemCount>0}?.getItemAt(0)?.uri;if(uri!=null){pasteMedia(uri);return true}};return super.onTextContextMenuItem(id)};override fun onCreateInputConnection(info:android.view.inputmethod.EditorInfo):android.view.inputmethod.InputConnection? {val connection=super.onCreateInputConnection(info);info.imeOptions=(info.imeOptions and android.view.inputmethod.EditorInfo.IME_FLAG_NO_ENTER_ACTION.inv() and android.view.inputmethod.EditorInfo.IME_MASK_ACTION.inv()) or android.view.inputmethod.EditorInfo.IME_ACTION_SEND;return connection}}.apply {hint="Message…";setSingleLine(false);textSize=16f;setTextColor(ink);setHintTextColor(muted);imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEND;setOnEditorActionListener {_,action,event->if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEND || (event?.keyCode==KeyEvent.KEYCODE_ENTER && !event.isShiftPressed)){if(event==null || event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0)sendButton?.performClick();true}else false};setOnKeyListener {_,code,event->if(code==KeyEvent.KEYCODE_ENTER&&!event.isShiftPressed){if(event.action==KeyEvent.ACTION_DOWN&&event.repeatCount==0)sendButton?.performClick();true}else false}}
@@ -800,7 +1022,7 @@ if(video!=null)row.addView(control("↶10","Skip backward 10 seconds"){move(posi
    val contactCard=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;visibility=View.GONE};photoRow.addView(View(this),LinearLayout.LayoutParams(0,1,1f));photoRow.addView(button("Show contact card"){contactCard.visibility=if(contactCard.visibility==View.GONE)View.VISIBLE else View.GONE}.apply {textSize=11f;minimumWidth=0;setPadding(dp(6),0,dp(6),0)});body.addView(text(presenceText(p),11f).apply {setTextColor(muted)});body.addView(contactCard);val qr=android.util.Base64.decode(p.getString("qr_png"),0);val qrBitmap=BitmapFactory.decodeByteArray(qr,0,qr.size);contactCard.addView(profileIcon(id,p.getString("name")),LinearLayout.LayoutParams(dp(64),dp(64)));contactCard.addView(text("${p.getString("name")} · @${p.getString("nickname")}\nInvitation code: $id",14f));contactCard.addView(ImageView(this).apply {setImageBitmap(qrBitmap);contentDescription="Contact invitation QR code";setBackgroundColor(Color.WHITE)},LinearLayout.LayoutParams(dp(174),dp(174)).apply {topMargin=dp(12)});contactCard.addView(text("Share your contact code or QR code to invite someone to X ORBIT.",12f).apply {setTextColor(muted)});contactCard.addView(button("Share to a contact"){async {val list=api().request("/users").getJSONArray("users");main.post {if(list.length()==0){toast("Add a contact first")}else android.app.AlertDialog.Builder(this).setTitle("Share contact card").setItems(Array(list.length()){list.getJSONObject(it).getString("name")}){_,position->val target=list.getJSONObject(position);val card=Bitmap.createBitmap(360,480,Bitmap.Config.ARGB_8888);val canvas=android.graphics.Canvas(card);canvas.drawColor(surface);val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=18f;textAlign=android.graphics.Paint.Align.CENTER};if(avatar.isNotEmpty()){val photo=android.util.Base64.decode(avatar,0);canvas.drawBitmap(ProfilePhotoDecoder.decode(photo),null,android.graphics.Rect(148,20,212,84),null)};canvas.drawText(p.getString("name"),180f,115f,paint);paint.textSize=14f;canvas.drawText("@${p.getString("nickname")}",180f,143f,paint);canvas.drawText("Invitation code: $id",180f,170f,paint);canvas.drawBitmap(qrBitmap,null,android.graphics.Rect(80,195,280,395),null);canvas.drawText("X ORBIT",180f,445f,paint);val file=File(cacheDir,"contact-card-$id.png");file.outputStream().use {card.compress(Bitmap.CompressFormat.PNG,100,it)};peer=target.getString("id");peerName=target.getString("name");showChat();onceChoice?.isChecked=false;draft?.setText("X ORBIT invitation: ${p.getString("name")} @$id · $id");previewSend(file=file,filename="X ORBIT-$id.png",mime="image/png")}.setNegativeButton("Cancel",null).show()}}})
    body.addView(text(p.getString("name"),24f));body.addView(text("@${p.getString("nickname")}",18f));body.addView(text("Invitation code: ${p.getString("id")}",14f).apply {setTextIsSelectable(true)})
    if(!own)body.addView(button("Media library"){showMediaLibrary(id)})
-   if(own){body.addView(button("Settings"){showSettings()});body.addView(button("Personalization"){showPersonalization()});body.addView(button("Wallet · test funds"){showWallet()});val name=field("Display name",p.getString("name"));val nickname=field("@nickname",p.getString("nickname"));body.addView(name);body.addView(nickname);val actions=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;visibility=View.GONE};actions.addView(button("Save profile"){val update=JSONObject().put("name",name.text.toString().trim()).put("nickname",nickname.text.toString().trim());profilePhotoDraft?.let {update.put("avatar",it).put("avatar_mime","image/jpeg")};async {val saved=api().request("/profile",update);prefs.edit().putString("name",saved.getString("name")).apply();profileCache.clear();main.post {showProfile(id);toast("Profile saved")}}});actions.addView(button("Discard changes"){showProfile(id)});body.addView(actions);profileDirtyCheck={actions.visibility=if(profilePhotoDraft!=null||name.text.toString()!=p.getString("name")||nickname.text.toString()!=p.getString("nickname"))View.VISIBLE else View.GONE};val watcher=object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){profileDirtyCheck?.invoke()};override fun afterTextChanged(e:android.text.Editable?) {}};name.addTextChangedListener(watcher);nickname.addTextChangedListener(watcher)
+   if(own){body.addView(button("Settings"){showSettings()});body.addView(button("Personalization"){showPersonalization()});body.addView(button("Message requests"){showMessageRequests()});body.addView(button("Wallet · test funds"){showWallet()});val name=field("Display name",p.getString("name"));val nickname=field("@nickname",p.getString("nickname"));body.addView(name);body.addView(nickname);val actions=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;visibility=View.GONE};actions.addView(button("Save profile"){val update=JSONObject().put("name",name.text.toString().trim()).put("nickname",nickname.text.toString().trim());profilePhotoDraft?.let {update.put("avatar",it).put("avatar_mime","image/jpeg")};async {val saved=api().request("/profile",update);prefs.edit().putString("name",saved.getString("name")).apply();profileCache.clear();main.post {showProfile(id);toast("Profile saved")}}});actions.addView(button("Discard changes"){showProfile(id)});body.addView(actions);profileDirtyCheck={actions.visibility=if(profilePhotoDraft!=null||name.text.toString()!=p.getString("name")||nickname.text.toString()!=p.getString("nickname"))View.VISIBLE else View.GONE};val watcher=object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){profileDirtyCheck?.invoke()};override fun afterTextChanged(e:android.text.Editable?) {}};name.addTextChangedListener(watcher);nickname.addTextChangedListener(watcher)
 
    }
   }}}
@@ -852,7 +1074,7 @@ if(video!=null)row.addView(control("↶10","Skip backward 10 seconds"){move(posi
   async {val item=try{api().request("/vibe/media?id=$ident&protected=1")}catch(e:Exception){main.post {if(generation==gen&&privateVibeId==ident){closeOnce();showGaming(page="/vibe.html",vibeRoute="visibility=private");toast(e.message?:"This Vibe is unavailable")}};return@async};val bytes=android.util.Base64.decode(item.getString("data"),0);main.post {if(gen!=generation||privateVibeId!=ident)return@post
    val stage=FrameLayout(this);val overlay=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(6),dp(8),dp(6),dp(4));background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.TRANSPARENT,Color.argb(210,8,11,19)))};body.addView(stage,LinearLayout.LayoutParams(-1,0,1f));if(item.getString("mime").startsWith("image/")){stage.addView(ImageView(this).apply {setImageBitmap(ProfilePhotoDecoder.decode(bytes));scaleType=ImageView.ScaleType.FIT_CENTER;attachVibeSwipe(this,root,{fraction->tapPrivateVibe(item,fraction)}){closeOnce();showGaming(page="/vibe.html",vibeRoute="visibility=private")}},FrameLayout.LayoutParams(-1,-1))}else{val f=File(cacheDir,"vibe-${UUID.randomUUID()}.video");f.writeBytes(bytes);currentFile=f;val clip=VideoView(this);video=clip;clip.setVideoPath(f.absolutePath);clip.setOnPreparedListener {it.isLooping=true;privateVibeLoaded=true;renderProtection()};clip.setOnClickListener {privateVibePaused=!privateVibePaused;if(privateVibePaused)clip.pause()else if(!covered())clip.start()};attachVibeSwipe(clip,root,{fraction->tapPrivateVibe(item,fraction)}){closeOnce();showGaming(page="/vibe.html",vibeRoute="visibility=private")};stage.addView(clip,FrameLayout.LayoutParams(-1,-1))}
    val author=item.getString("uid");val own=author==prefs.getString("id","");val tools=LinearLayout(this).apply {gravity=Gravity.CENTER_VERTICAL}
-   if(!own)for(emoji in listOf("❤️","🔥","😂","👏"))tools.addView(button(emoji){async {api().request("/vibe/react",JSONObject().put("id",ident).put("emoji",emoji));main.post {if(privateVibeId==ident)toast("Reaction sent")}}}.apply {textSize=19f;background=null;minWidth=0;setPadding(dp(4),0,dp(4),0)},LinearLayout.LayoutParams(dp(38),dp(40)))
+   if(!own)for(emoji in listOf("❤️","🔥","😂","👏"))tools.addView(button(emoji){async {api().request("/vibe/react",JSONObject().put("id",ident).put("emoji",emoji));main.post {if(privateVibeId==ident)syncNavigationState()}}}.apply {textSize=19f;background=null;minWidth=0;setPadding(dp(4),0,dp(4),0)},LinearLayout.LayoutParams(dp(38),dp(40)))
    tools.addView(View(this),LinearLayout.LayoutParams(0,1,1f))
    if(own)tools.addView(ImageButton(this).apply {setImageResource(R.drawable.ic_password_eye);imageTintList=android.content.res.ColorStateList.valueOf(ink);background=null;contentDescription="View viewers";setOnClickListener {async {val viewers=api().request("/vibe/viewers?id=$ident").getJSONArray("viewers");val names=(0 until viewers.length()).map {i->val v=viewers.getJSONObject(i);v.getString("name")+" · "+java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT).format(java.util.Date(v.getLong("last_seen")*1000))+" "+v.optString("emoji","")};main.post {if(privateVibeId==ident)android.app.AlertDialog.Builder(this@MainActivity).setTitle("Viewers · "+viewers.length()).setMessage(if(names.isEmpty())"No views yet." else names.joinToString("\n")).setPositiveButton("Close",null).show()}}}},LinearLayout.LayoutParams(dp(40),dp(40)))
    if(own)tools.addView(text(item.optInt("view_count").toString(),12f).apply {contentDescription="Vibe view count"})
@@ -879,7 +1101,33 @@ if(video!=null)row.addView(control("↶10","Skip backward 10 seconds"){move(posi
  android.view.MotionEvent.ACTION_UP->{if(dragging){val go= -root.translationX>=root.width*.5f;root.animate().translationX(if(go)-root.width.toFloat() else 0f).setDuration(motion(220L)).setInterpolator(android.view.animation.DecelerateInterpolator()).withEndAction {reset();if(go){homeCalls=false;homeSearch=false;showPeople()}}.start();return true};edge=false}
  android.view.MotionEvent.ACTION_CANCEL->{if(dragging)root.animate().translationX(0f).setDuration(motion(180L)).withEndAction {reset()}.start() else reset()}}
  return super.dispatchTouchEvent(event)}};gamingWeb=web;web.setBackgroundColor(Color.TRANSPARENT);web.settings.javaScriptEnabled=true;web.settings.domStorageEnabled=true;web.settings.allowFileAccess=false;web.settings.allowContentAccess=true
-  web.addJavascriptInterface(object {@android.webkit.JavascriptInterface fun moduleTabs()=nativeModules;@android.webkit.JavascriptInterface fun settings(){main.post {if(screen=="gaming"&&gamingWeb===web)showNavigationMenu(web)}};@android.webkit.JavascriptInterface fun orbitChat(){main.post {prefs.edit().remove("vibe_return").apply();homeCalls=false;homeSearch=false;showPeople()}};@android.webkit.JavascriptInterface fun vibeDestination(id:String,address:String){main.post {openVibeDestination(id,address)}};@android.webkit.JavascriptInterface fun vibeChat(id:String,peer:String){main.post {openVibeDestination(id,chat=true)}};@android.webkit.JavascriptInterface fun returnVibe(){main.post {if(!returnToVibe())showGaming(page="/vibe.html")}};@android.webkit.JavascriptInterface fun vibeViewer(open:Boolean){main.post {if(screen=="gaming"&&gamingWeb===web&&page=="/vibe.html")root.findViewWithTag<View>("vibe-bottom-tabs")?.visibility=if(open)View.GONE else View.VISIBLE}};@android.webkit.JavascriptInterface fun privateVibe(id:String){main.post {if(screen=="gaming"&&gamingWeb===web)showPrivateVibe(id)}};@android.webkit.JavascriptInterface fun orbitPlay(){main.post {showGaming()}};@android.webkit.JavascriptInterface fun market(){main.post {showGaming(page="/market.html")}};@android.webkit.JavascriptInterface fun profile(){main.post {showProfile(prefs.getString("id","")!!)}};@android.webkit.JavascriptInterface fun calls(){main.post {homeCalls=true;homeSearch=false;showPeople()}};@android.webkit.JavascriptInterface fun wallet(){main.post {showWallet()}};@android.webkit.JavascriptInterface fun welcomeSeen()=gamingWelcomeShown;@android.webkit.JavascriptInterface fun markWelcome(){gamingWelcomeShown=true};@android.webkit.JavascriptInterface fun appearance()=if(bright)"bright" else "dark";@android.webkit.JavascriptInterface fun palette()=this@MainActivity.palette.toString();@android.webkit.JavascriptInterface fun session()=JSONObject().put("id",prefs.getString("id","")).put("token",prefs.getString("token","")).toString();@android.webkit.JavascriptInterface fun close(){main.post {if(!returnToVibe())showPeople()}};@android.webkit.JavascriptInterface fun openChat(id:String,name:String){if(!id.matches(Regex("[a-f0-9]{12}")))return;val gen=generation;val client=api();net.execute {try{val seller=client.request("/profile?id="+id);main.post {if(screen=="gaming"&&gamingWeb===web&&generation==gen&&prefs.getString("token","")==client.token){peer=id;peerName=seller.getString("name");showChat()}}}catch(_:Exception){main.post {if(generation==gen)toast("This seller conversation is unavailable")}}}};@android.webkit.JavascriptInterface fun openLink(address:String){main.post {try{val u=Uri.parse(address);if(u.scheme=="https"&&!u.host.isNullOrEmpty()&&u.userInfo==null)startActivity(Intent(Intent.ACTION_VIEW,u))}catch(_:Exception){toast("Could not open website")}}};@android.webkit.JavascriptInterface fun shareListing(id:String,title:String){if(!id.matches(Regex("[a-f0-9]{32}"))||title.length>80)return;main.post {startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,title+"\n"+base+"/market.html?listing="+id),"Share listing"))}};@android.webkit.JavascriptInterface fun shareCard(encoded:String){if(encoded.length>4000000)return;main.post {try{val dir=File(cacheDir,"clipboard").apply {mkdirs()};val file=File(dir,"gamebox-rank.png");file.writeBytes(android.util.Base64.decode(encoded,0));val uri=androidx.core.content.FileProvider.getUriForFile(this@MainActivity,"$packageName.clipboard",file);startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),"Share rank card"))}catch(_:Exception){toast("Could not share rank card")}}}},"GuardianGaming")
+  web.addJavascriptInterface(object {@android.webkit.JavascriptInterface fun moduleTabs()=nativeModules;@android.webkit.JavascriptInterface fun settings(){main.post {if(screen=="gaming"&&gamingWeb===web)showNavigationMenu(web)}};@android.webkit.JavascriptInterface fun orbitChat(){main.post {prefs.edit().remove("vibe_return").apply();homeCalls=false;homeSearch=false;showPeople()}};@android.webkit.JavascriptInterface fun vibeDestination(id:String,address:String){main.post {openVibeDestination(id,address)}};@android.webkit.JavascriptInterface fun vibeChat(id:String,peer:String){main.post {openVibeDestination(id,chat=true)}};@android.webkit.JavascriptInterface fun returnVibe(){main.post {if(!returnToVibe())showGaming(page="/vibe.html")}};@android.webkit.JavascriptInterface fun vibeViewer(open:Boolean){main.post {if(screen=="gaming"&&gamingWeb===web&&page=="/vibe.html")root.findViewWithTag<View>("vibe-bottom-tabs")?.visibility=if(open)View.GONE else View.VISIBLE}};@android.webkit.JavascriptInterface fun privateVibe(id:String){main.post {if(screen=="gaming"&&gamingWeb===web)showPrivateVibe(id)}};@android.webkit.JavascriptInterface fun orbitPlay(){main.post {showGaming()}};@android.webkit.JavascriptInterface fun market(){main.post {showGaming(page="/market.html")}};@android.webkit.JavascriptInterface fun profile(){main.post {showProfile(prefs.getString("id","")!!)}};@android.webkit.JavascriptInterface fun calls(){main.post {homeCalls=true;homeSearch=false;showPeople()}};@android.webkit.JavascriptInterface fun wallet(){main.post {showWallet()}};/**
+    * Compatibility bridge for older Play pages.
+    * @return Whether Play has displayed its intro in this app process.
+    * @throws IllegalArgumentException Only on an invalid internal module constant.
+    */
+   @android.webkit.JavascriptInterface fun welcomeSeen()=moduleIntros.hasSeen("play")
+   /**
+    * Compatibility bridge recording Play's actual introductory display.
+    * @return Unit; repeated marks do not change the session.
+    * @throws IllegalArgumentException Only on an invalid internal module constant.
+    */
+   @android.webkit.JavascriptInterface fun markWelcome(){moduleIntros.markSeen("play")}
+   /**
+    * Read independent section state without consuming it.
+    * @param module "play" or "plaza".
+    * @return Whether that introduction has displayed in this process.
+    * @throws IllegalArgumentException If module is unsupported.
+    */
+   @android.webkit.JavascriptInterface fun moduleIntroSeen(module:String)=moduleIntros.hasSeen(module)
+   /**
+    * Mark an intro only after its committed page becomes visible.
+    * @param module "play" or "plaza".
+    * @return Unit; the flag remains process-scoped.
+    * @throws IllegalArgumentException If module is unsupported.
+    */
+   @android.webkit.JavascriptInterface fun markModuleIntro(module:String){moduleIntros.markSeen(module)}
+   @android.webkit.JavascriptInterface fun appearance()=if(bright)"bright" else "dark";@android.webkit.JavascriptInterface fun palette()=this@MainActivity.palette.toString();@android.webkit.JavascriptInterface fun session()=JSONObject().put("id",prefs.getString("id","")).put("token",prefs.getString("token","")).toString();@android.webkit.JavascriptInterface fun close(){main.post {if(!returnToVibe())showPeople()}};@android.webkit.JavascriptInterface fun openChat(id:String,name:String){if(!id.matches(Regex("[a-f0-9]{12}")))return;val gen=generation;val client=api();net.execute {try{val seller=client.request("/profile?id="+id);main.post {if(screen=="gaming"&&gamingWeb===web&&generation==gen&&prefs.getString("token","")==client.token){peer=id;peerName=seller.getString("name");showChat()}}}catch(_:Exception){main.post {if(generation==gen)toast("This seller conversation is unavailable")}}}};@android.webkit.JavascriptInterface fun openLink(address:String){main.post {try{val u=Uri.parse(address);if(u.scheme=="https"&&!u.host.isNullOrEmpty()&&u.userInfo==null)startActivity(Intent(Intent.ACTION_VIEW,u))}catch(_:Exception){toast("Could not open website")}}};@android.webkit.JavascriptInterface fun shareListing(id:String,title:String){if(!id.matches(Regex("[a-f0-9]{32}"))||title.length>80)return;main.post {startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,title+"\n"+base+"/market.html?listing="+id),"Share listing"))}};@android.webkit.JavascriptInterface fun shareCard(encoded:String){if(encoded.length>4000000)return;main.post {try{val dir=File(cacheDir,"clipboard").apply {mkdirs()};val file=File(dir,"gamebox-rank.png");file.writeBytes(android.util.Base64.decode(encoded,0));val uri=androidx.core.content.FileProvider.getUriForFile(this@MainActivity,"$packageName.clipboard",file);startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),"Share rank card"))}catch(_:Exception){toast("Could not share rank card")}}}},"GuardianGaming")
   val comparisonAssets=ComparisonWebAssets(this,base);web.webViewClient=object:android.webkit.WebViewClient(){override fun shouldInterceptRequest(v:android.webkit.WebView,r:android.webkit.WebResourceRequest):android.webkit.WebResourceResponse?=if(BuildConfig.BUNDLED_INTERFACE)comparisonAssets.response(r) else null;override fun shouldOverrideUrlLoading(v:android.webkit.WebView,r:android.webkit.WebResourceRequest):Boolean {val u=r.url;return u.scheme!="https"||u.host!=origin.host||u.port!=origin.port||u.path!=page}}
   web.webChromeClient=object:android.webkit.WebChromeClient(){
    override fun onGeolocationPermissionsShowPrompt(address:String,callback:android.webkit.GeolocationPermissions.Callback){main.post {

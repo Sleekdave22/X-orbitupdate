@@ -116,6 +116,41 @@ body.orbit-module-shell>main>#chatSearch{grid-column:1/-1;grid-row:1;width:100%;
 .orbit-bottom-nav .chat-unread-badge{display:flex!important;align-items:center;justify-content:center;min-width:16px;width:max-content;height:16px;padding:0 4px;box-sizing:border-box;max-width:none;border:0!important;border-radius:999px!important;background:#e53945!important;color:#fff!important;font:600 10px/16px system-ui!important;white-space:nowrap;overflow:visible!important}
 html.orbit-native #vibeFooter{display:none!important}
 
+/* Viewport-owned drawers sit above fixed module/bottom tabs, never inside header stacking. */
+#navigationMenu,#settingsPanel{width:50vw!important;box-sizing:border-box;max-width:50vw;min-width:0;z-index:12020!important;overflow-x:hidden}
+#settingsShade{position:fixed;inset:0;background:#0006;z-index:12010!important}
+#settingsPanel{position:fixed;right:0;top:0;bottom:0;height:100dvh;padding:max(18px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));overflow-y:auto;animation:orbit-drawer-in .23s ease-out;box-shadow:-16px 0 48px #0003}
+#settingsPanel:not([hidden]){display:flex;flex-direction:column;gap:6px}
+#settingsPanel>*{flex-shrink:0;min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+#moduleSettingsTools button{display:block;width:100%;text-align:left;white-space:normal;font-size:12px;margin:6px 0}
+#settingsPanel .settings-copyright{margin-top:auto}
+@media(prefers-reduced-motion:reduce){#navigationMenu,#settingsPanel{animation:none}}
+
+/* Presentation only: preserve message text, bubble colours and the reply arrow. */
+.message-body .emoji-only-message{font-size:1.5em;line-height:1.35;overflow-wrap:anywhere}
+.message-body .vibe-reply-label{font-size:.75em;font-style:italic}
+
+/* Date markers stay in normal message flow and pin only inside the reading area. */
+.chat-date-divider{position:sticky;top:0;z-index:3;text-align:center;font-size:11px;line-height:20px;padding:3px 8px;margin:3px 0;background:var(--card,#131932);color:var(--muted,#aab1c4);border-radius:8px;pointer-events:none}
+#messages{scroll-padding-top:32px}
+#messages>.message{scroll-margin-top:32px}
+.delivery-status.failed{background:var(--coral,#e53945)!important;border-color:var(--coral,#e53945)!important}
+.send-failure{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%;margin-top:5px}
+.send-failure small{width:100%;font-size:11px;overflow-wrap:anywhere}
+.send-failure button{padding:5px 8px!important;font-size:11px!important;min-height:30px;margin:0!important}
+.chat-pins{display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:0;padding:3px 0}
+.chat-pins[hidden]{display:none}
+.chat-pins button{min-width:0;min-height:32px;padding:4px 8px;font-size:12px;margin:0}
+.chat-pins button:first-child{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pinned-message-list{max-width:min(90vw,560px);max-height:75dvh;overflow:auto}
+.pinned-message-row{display:flex;gap:6px;align-items:center;margin-top:6px}
+.pinned-message-row button{font-size:12px;margin:0;min-height:36px}
+.pinned-message-row button:first-child{flex:1;text-align:left;overflow-wrap:anywhere}
+.message-request-preview{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.message-request-preview p{margin:4px 0}
+.message-request-actions{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0}
+.message-request-actions button{font-size:12px;min-height:34px;margin:0;padding:5px 8px}
+
 /* Browser snapshots move content without transforming its fixed navigation. */
 @view-transition{navigation:auto}
 :root{--orbit-flow-enter:12%;--orbit-flow-exit:-12%}
@@ -144,13 +179,9 @@ body.orbit-module-shell .brand-header,body.orbit-module-shell>header{view-transi
 
 .orbit-bottom-nav,.orbit-module-switcher{-webkit-user-select:none;user-select:none}
 
-/* Viewport-owned drawers sit above fixed module/bottom tabs, never inside header stacking. */
-#navigationMenu,#settingsPanel{width:50vw!important;box-sizing:border-box;max-width:50vw;min-width:0;z-index:12020!important;overflow-x:hidden}
-#settingsShade{position:fixed;inset:0;background:#0006;z-index:12010!important}
-#settingsPanel{position:fixed;right:0;top:0;bottom:0;height:100dvh;padding:max(18px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));overflow-y:auto;animation:orbit-drawer-in .23s ease-out;box-shadow:-16px 0 48px #0003}
-#settingsPanel:not([hidden]){display:flex;flex-direction:column;gap:6px}
-#settingsPanel>*{flex-shrink:0;min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
-#moduleSettingsTools button{display:block;width:100%;text-align:left;white-space:normal;font-size:12px;margin:6px 0}
-#settingsPanel .settings-copyright{margin-top:auto}
-@media(prefers-reduced-motion:reduce){#navigationMenu,#settingsPanel{animation:none}}
-
+/* Plaza reuses Play's existing entry structure, motion and account palette. */
+.orbit-module-intro{position:fixed;inset:0;z-index:100;background:var(--surface);color:var(--ink);display:flex;flex-direction:column;justify-content:center;padding:28px;align-items:center;text-align:center}
+.orbit-module-intro[hidden]{display:none!important}
+.orbit-module-intro strong{font-size:clamp(30px,6vw,58px);color:var(--accent)}
+.orbit-module-intro p{max-width:450px}
+.orbit-module-intro button{color:#fff;background:var(--accent)}

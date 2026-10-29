@@ -19,6 +19,7 @@ def init(server):
   d.execute('CREATE TABLE IF NOT EXISTS vibe_media_metadata(item TEXT PRIMARY KEY,asset TEXT,duration_ms INTEGER NOT NULL,start_ms INTEGER NOT NULL,end_ms INTEGER NOT NULL)')
   __import__('vibe_sources').schema(d)
   __import__('vibe_privacy').schema(d)
+  __import__('vibe_messages').schema(d)
 
 def recipients(d,uid,visibility,audience):
  if not isinstance(audience,list) or len(audience)>200 or any(not isinstance(x,str) for x in audience):raise ValueError('Choose valid private recipients')
@@ -139,6 +140,13 @@ def validate(b):
  raise ValueError('Vibes support JPEG, PNG, MP4 and WebM')
 
 def post(server,uid,action,b):
+ """Handle authenticated Vibe actions, returning a persisted response dictionary.
+
+ Args: server (ChatServer), uid (str), action (str), b (dict): HTTP action context.
+ Raises: ValueError/PermissionError for invalid input or visibility; SQLite errors
+ roll back writes. Reaction delivery uses its own atomic message/request handler.
+ """
+ if action=='react':return __import__('vibe_messages').react(server,uid,b)
  now=int(time.time())
  edited=None
  if action=='publish':
@@ -190,20 +198,18 @@ def post(server,uid,action,b):
   if action=='view':
    if r['uid']!=uid:d.execute('INSERT INTO vibe_views VALUES(?,?,?,?,1) ON CONFLICT(item,uid) DO UPDATE SET last_seen=excluded.last_seen,opens=opens+1',(r['id'],uid,now,now))
    return {'ok':True}
-  if action=='react':
-   emoji=b.get('emoji')
-   if emoji not in EMOJI or r['uid']==uid:raise ValueError('Choose an available reaction to another account')
-   prior=d.execute('SELECT emoji FROM vibe_reactions WHERE item=? AND uid=?',(r['id'],uid)).fetchone()
-   d.execute('INSERT INTO vibe_reactions VALUES(?,?,?,?) ON CONFLICT(item,uid) DO UPDATE SET emoji=excluded.emoji,created=excluded.created',(r['id'],uid,emoji,now))
-   if not prior or prior['emoji']!=emoji:__import__('account_notifications').add(d,r['uid'],'vibe',r['visibility'],'Someone reacted '+emoji+' to your Vibe.',{'item':r['id'],'visibility':r['visibility']})
-   return {'ok':True}
   if action=='remove':
    if r['uid']!=uid:raise PermissionError('Only the author can remove this Vibe')
    d.execute('UPDATE vibe_items SET expires=?,media=NULL WHERE id=?',(now,r['id']));return {'ok':True}
   raise ValueError('Unknown Vibe action')
 
 def reply(server,uid,b):
- """Send from the viewer using the existing contact, block and push contracts."""
+ """Send a private Vibe reply through existing contact, block and push contracts.
+
+ Args: server (ChatServer), uid (str), b (dict): id, text and stable client_id.
+ Returns: dict with persisted message ID. Raises ValueError/PermissionError for
+ retry conflicts or unauthorized content; SQLite errors roll back the write.
+ """
  ident=str(b.get('id',''));client=b.get('client_id');text=b.get('text')
  if not isinstance(client,str) or not 1<=len(client)<=80 or not isinstance(text,str) or not 1<=len(text.strip())<=3800:raise ValueError('Write a reply of up to 3800 characters')
  text=text.strip()
@@ -218,7 +224,7 @@ def reply(server,uid,b):
   if target==uid:raise ValueError('Choose a contact’s Vibe to reply')
   if not d.execute('SELECT 1 FROM contacts WHERE owner=? AND peer=?',(uid,target)).fetchone():raise PermissionError('Add this account to your chats before replying')
   if d.execute('SELECT 1 FROM messages WHERE sender=? AND client_id=?',(uid,client)).fetchone():raise ValueError('This retry key belongs to another message')
-  heading='↪ Reply to your '+('Private Vibe' if r['visibility']=='private' else 'Vibe')
+  heading='↪ Reply to Vibe'
   mid=d.execute('INSERT INTO messages(sender,recipient,text,time,client_id,size) VALUES(?,?,?,?,?,0)',(uid,target,heading+'\n'+text,int(time.time()*1000),client)).lastrowid
   d.execute('INSERT INTO vibe_replies VALUES(?,?,?,?,?)',(mid,ident,r['visibility'],uid,client))
   d.execute('DELETE FROM chat_hidden WHERE owner=? AND peer=?',(uid,target))

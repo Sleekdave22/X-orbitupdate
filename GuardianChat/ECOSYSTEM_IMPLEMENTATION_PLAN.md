@@ -54,3 +54,20 @@ they do not cancel the ecosystem work above or authorize moving unrelated contro
 Native/browser checks must be reported separately from physical S21 checks. A
 working capture/editor or WebView does not establish cross-device acceptance of
 new messaging/group features. No phone-contact linking or SMS work is resumed.
+
+## Current publication instruction — 29 October 2026
+
+The user selected **Keep changes local for now** when asked about saving the
+settings/Vibe checkpoint. Continue authorized local implementation and tests, but
+do not create further GitHub commits, update remote refs, push or publish these
+changes without a new explicit instruction. Earlier private-result checkpoint
+779ace417ec67f1d10c368b42a2a9db10d62ae06 was already saved remotely before this
+choice. Settings and Vibe fixes remain local; candidate snapshots in the local
+temporary directory are not deployed builds or published GitHub commits.
+
+The user subsequently instructed **push and install when done** on 29 October.
+This authorizes committing/pushing completed tested checkpoints to the current
+feature branch and updating the S21, preserving main and the original X-Orbit
+repository. Do not describe unfinished handoff stages as complete; do not publish
+untested code or change existing connection-consent policy without resolving the
+reported Add-to-chats/message-request conflict.

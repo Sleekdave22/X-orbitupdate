@@ -90,6 +90,7 @@ class UnifiedVibeTest(unittest.TestCase):
  def test_private_follow_requires_acceptance_and_profile_acl_remains_enforced(self):
   a=self.user('Private');b=self.user('Follower');self.identity(a);self.identity(b)
   self.call('/contacts',{'code':b['id']},a['token'])
+  self.call('/social/message_accept',{'target':a['id']},b['token'])
   self.call('/social/settings',{'private':True,'discoverable':False,'bio':'','alerts':True},a['token'])
   with self.assertRaises(urllib.error.HTTPError):self.share(a,'profile',a['id'],game='efootball',visibility='private',audience=[b['id']])
   self.call('/social/follow',{'target':a['id']},b['token']);self.assertEqual(self.call('/social/profile?id='+a['id'],token=b['token'])['relationship'],'pending')

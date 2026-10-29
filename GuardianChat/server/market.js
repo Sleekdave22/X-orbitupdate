@@ -13,7 +13,7 @@ function price(a){return OrbitMarketTypes.price(a)}
 async function loadImage(id,image){try{const r=await api('/market/image?id='+encodeURIComponent(id));if(image.isConnected)image.src='data:'+r.mime+';base64,'+r.data}catch{image.alt='Product image unavailable'}}
 function photograph(a,all=false){const box=node('div','',all?'product-gallery':'product-thumbnail');for(const id of (all?a.images:(a.images||[]).slice(0,1))){const im=node('img');im.alt=a.title;im.loading='lazy';box.append(im);loadImage(id,im)}return box}
 function adCard(a){const c=node('article','','ad');const open=btn('',()=>showListing(a.id),'listing-open');open.append(node('h3',a.title),node('small',([a.city,a.country].filter(Boolean).join(', ')||'Location not provided')+(a.distance_km!=null?' · about '+a.distance_km+' km':''),'listing-location'),node('em','@'+(a.nickname||a.uid),'listing-handle'));c.append(open);return c}
-async function message(uid,name){try{await api('/contacts',{code:uid});if(native&&GuardianGaming.openChat)GuardianGaming.openChat(uid,name);else location.assign('/?chat='+encodeURIComponent(uid))}catch(e){say(e.message)}}
+async function message(uid,name){try{const connection=await api('/contacts',{code:uid});if(connection.state!=='accepted'){say('Message request sent. The other person must accept before you can chat.');return}if(native&&GuardianGaming.openChat)GuardianGaming.openChat(uid,name);else location.assign('/?chat='+encodeURIComponent(uid))}catch(e){say(e.message)}}
 async function report(a){const reason=prompt('Why are you reporting this listing?');if(reason===null)return;try{await api('/market/report',{id:a.id,reason});say('Report received for moderation.')}catch(e){say(e.message)}}
 function returnToVibe(){if(native&&GuardianGaming.returnVibe)GuardianGaming.returnVibe();else location.assign(OrbitVibeReturn.url(account))}
 function page(title){generation++;$('sellItem').setAttribute('aria-pressed','false');const v=$('view');v.replaceChildren(btn('‹ Back',()=>{if(new URLSearchParams(location.search).has('from_vibe'))returnToVibe();else{tab='browse';render()}},'market-back'),node('h2',title));return v}
@@ -140,3 +140,5 @@ async function toggleMarketNotifications(){
 }
 document.addEventListener("pointerdown",e=>{if(marketNotifications&&!marketNotifications.contains(e.target)&&!marketBell.contains(e.target))closeMarketNotifications()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMarketNotifications()});
+
+window.OrbitModuleIntro?.show('plaza');
