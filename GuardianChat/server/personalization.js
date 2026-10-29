@@ -52,11 +52,15 @@
   const uid=owner,token=session,g=++generation;busy=true;render();status.textContent='Selecting…';
   try{const r=await fetch('/preferences',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({palette:p.id})});if(!r.ok)throw Error('Could not save. Your current colours are unchanged. Try again.');const data=await r.json();if(g!==generation||account()?.id!==uid||account()?.token!==token)return;choices=data.choices;const saved=choices.find(p=>p.id===data.palette);if(!saved)throw Error('The selected pair is unavailable. Try again.');localStorage.setItem('xorbit-palette-'+uid,JSON.stringify(saved));draft=null;apply(saved);status.textContent=saved.name+' selected for your account.'}catch(e){if(g===generation)status.textContent=e.message}finally{if(g===generation){busy=false;render()}}
  }
+ /** Install the existing picker in a section-owned settings drawer.
+  * @returns {void} Idempotent after delayed mounting; DOM errors propagate.
+  */
  function mount(){
   const settings=document.getElementById('settingsPanel');if(!settings)return;
+  if(document.getElementById('openPersonalization'))return;
   const button=document.createElement('button');button.id='openPersonalization';button.type='button';button.textContent='Personalization';button.title='Preview and select a colour pair with its matching wallpaper';settings.insertBefore(button,settings.querySelector('label[for=appearance]'));
   const dialog=document.createElement('dialog');dialog.id='personalizationDialog';dialog.setAttribute('aria-label','Personalization');
-  dialog.innerHTML='<h2>Choose your colour pair</h2><p>Left half: sent messages and selected tabs. Right half: received messages and faded inactive tabs.<br>Preview a pair, then press Select to save it.</p><div class="palette-mode" role="group" aria-label="Wallpaper preview appearance"><button type="button" id="paletteDark">Dark preview</button><button type="button" id="paletteLight">Light preview</button></div><div id="paletteScene" class="palette-scene"><strong id="palettePreviewHeading">OrbitChat · OrbitPlay</strong><div class="palette-preview received-preview" id="receivedPreview">A message for you</div><div class="palette-preview sent-preview" id="sentPreview">Your reply</div></div><div id="paletteOptions" role="radiogroup" aria-label="Colour pairs"></div><p id="paletteStatus" role="status"></p><div class="palette-footer"><button type="button" id="closePalette">Close</button><button type="button" id="savePalette" class="orbit-primary">Select</button></div>';
+  dialog.innerHTML='<h2>Choose your colour pair</h2><p>Left half: sent messages and selected tabs. Right half: received messages and faded inactive tabs.<br>Preview a pair, then press Select to save it.</p><div class="palette-mode" role="group" aria-label="Wallpaper preview appearance"><button type="button" id="paletteDark">Dark preview</button><button type="button" id="paletteLight">Light preview</button></div><div id="paletteScene" class="palette-scene"><strong id="palettePreviewHeading">X-Orbit appearance</strong><div class="palette-preview received-preview" id="receivedPreview">A message for you</div><div class="palette-preview sent-preview" id="sentPreview">Your reply</div></div><div id="paletteOptions" role="radiogroup" aria-label="Colour pairs"></div><p id="paletteStatus" role="status"></p><div class="palette-footer"><button type="button" id="closePalette">Close</button><button type="button" id="savePalette" class="orbit-primary">Select</button></div>';
   document.body.append(dialog);
   button.onclick=()=>{draft=null;previewBright=document.documentElement.dataset.theme==='bright';document.getElementById('paletteStatus').textContent='';dialog.showModal();render();refresh(true)};
   dialog.onclose=()=>{draft=null};dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault()});
@@ -67,7 +71,7 @@
  // Apply this account's saved appearance before any stylesheet or body can paint.
  try{const native=bridge();if(native)document.documentElement.classList?.add('orbit-native');if(native&&typeof native.moduleTabs==='function'&&native.moduleTabs())document.documentElement.classList?.add('native-module-shell');document.documentElement.dataset.theme=native&&typeof native.appearance==='function'?native.appearance():localStorage.getItem('guardianchat-theme')==='bright'?'bright':'dark'}catch(_){}
  const initial=account();apply(initial?cached(initial.id):null);
- window.OrbitPersonalization={refresh};
+ window.OrbitPersonalization={refresh,mount};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mount();refresh(true)});else{mount();refresh(true)}
  setInterval(()=>refresh(),2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true)});window.addEventListener('storage',()=>refresh(true));
 })();

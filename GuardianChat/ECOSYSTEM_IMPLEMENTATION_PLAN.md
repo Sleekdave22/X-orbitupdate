@@ -27,3 +27,30 @@ draft changes predating this plan are separate and must not enter result commits
 Rollback: disable new feature entry points while retaining additive records. Do
 not restore an old database over intervening user activity. Review source and
 schema compatibility before deployment; use isolated test data throughout.
+
+## Additional authorized handoffs and settings correction
+
+The user added the Vibe reaction/engagement handoff and the consolidated messaging
+handoff, plus section-owned settings corrections. These extend the approved scope;
+they do not cancel the ecosystem work above or authorize moving unrelated controls.
+
+- Fix existing settings: half-width panels above navigation; Play/Plaza stay in
+  their own modules. Reuse account appearance and existing section tools.
+- Fix Vibe reactions reaching private conversations, backend acceptance before UI
+  success, offline persistence and request consent. Normalize the display label to
+  “Reply to Vibe”, smaller/italic while keeping the existing arrow. Emoji-only
+  text becomes 150% size without changing stored messages.
+- Complete nonintrusive delivery/connection feedback and sticky local-date
+  dividers in private/group history; do not suppress real failures or retry state.
+- Reuse existing personal chat pins; add shared message pins with permissions and
+  safe previews. Expand existing message requests with previews, Accept, Decline,
+  Decline & Block and Report; preserve accepted history and no pending read receipts.
+- Add group creation/messaging, attachments/replies, membership/admin succession,
+  configurable sending/detail/pin permissions, notifications and protected access.
+- Add persistent Plaza reactions across four listing types. Build Show Off first
+  before connecting its reactions/comments; comments default ON, can be disabled
+  by owner/moderator, and old comments remain when disabled.
+
+Native/browser checks must be reported separately from physical S21 checks. A
+working capture/editor or WebView does not establish cross-device acceptance of
+new messaging/group features. No phone-contact linking or SMS work is resumed.

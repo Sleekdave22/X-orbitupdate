@@ -143,3 +143,14 @@ body.orbit-module-shell .brand-header,body.orbit-module-shell>header{view-transi
 .orbit-bottom-nav img,.orbit-module-switcher img{-webkit-user-drag:none;user-select:none}
 
 .orbit-bottom-nav,.orbit-module-switcher{-webkit-user-select:none;user-select:none}
+
+/* Viewport-owned drawers sit above fixed module/bottom tabs, never inside header stacking. */
+#navigationMenu,#settingsPanel{width:50vw!important;box-sizing:border-box;max-width:50vw;min-width:0;z-index:12020!important;overflow-x:hidden}
+#settingsShade{position:fixed;inset:0;background:#0006;z-index:12010!important}
+#settingsPanel{position:fixed;right:0;top:0;bottom:0;height:100dvh;padding:max(18px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));overflow-y:auto;animation:orbit-drawer-in .23s ease-out;box-shadow:-16px 0 48px #0003}
+#settingsPanel:not([hidden]){display:flex;flex-direction:column;gap:6px}
+#settingsPanel>*{flex-shrink:0;min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+#moduleSettingsTools button{display:block;width:100%;text-align:left;white-space:normal;font-size:12px;margin:6px 0}
+#settingsPanel .settings-copyright{margin-top:auto}
+@media(prefers-reduced-motion:reduce){#navigationMenu,#settingsPanel{animation:none}}
+

@@ -21,7 +21,7 @@ if(['play','chat','market'].includes(module)){
  window.OrbitSwitch?.mount(nav,items,current);
  if(module==='market'||module==='play'){
   const settings=make('button');settings.type='button';settings.id=module==='market'?'marketSettings':'playSettings';settings.setAttribute('aria-label','Open settings');settings.title='Account settings';settings.innerHTML='<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
-  settings.onclick=()=>{if(native&&GuardianGaming.settings)GuardianGaming.settings();else location.assign('/?home=settings')};header?.append(settings);const bell=document.getElementById('marketActivityBell');if(bell)header.append(bell);
+  settings.onclick=()=>{if(native&&GuardianGaming.settings)GuardianGaming.settings();else window.OrbitModuleSettings.open(module,settings)};header?.append(settings);const bell=document.getElementById('marketActivityBell');if(bell)header.append(bell);
  }
 }
 function badge(target,count,label='unread messages'){const host=target.querySelector('.orbit-tab-artwork')||target;let b=target.querySelector('.chat-unread-badge');if(!count){b?.remove();return}if(!b){b=make('span');b.className='chat-unread-badge';host.append(b)}b.textContent=count>99?'99+':String(count);b.setAttribute('aria-label',count+' '+label)}

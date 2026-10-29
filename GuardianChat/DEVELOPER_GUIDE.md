@@ -11,6 +11,7 @@ One shared Python backend owns identities, SQLite data and feature decisions. Br
 | HTTP routing, auth, messages, attachments, calls | server/server.py; server/index.html; chat/.../MainActivity.kt and ChatApi.kt | users, sessions, contacts, messages, call_history; test_server.py, test_message_notifications.py |
 | Identity, profiles, account search/preferences | server/social.py, account_invites.py, account_preferences.py; account-search.js, personalization.js | social_* and account_*; test_social.py, test_account_search.py, test_account_preferences.py |
 | Bottom-tab counts and seen receipts | server/navigation_state.py; orbit-navigation.js; MainActivity.kt | navigation_call_views, messages, vibe_views; test_navigation_state.py |
+| Module-owned settings and overlay layers | server/module-settings.js, module-navigation.js, navigation.css; MainActivity.kt showNavigationMenu/showSettings | Existing preferences and module tools; test_module_settings.js |
 | Vibe feed, privacy, reactions/replies | server/vibes.py, vibe_privacy.py, vibe_sources.py; vibe.js, vibe-cache.js | vibe_*; test_vibes_activity.py, test_vibe_privacy.py, test_vibe_sources.py |
 | Crop/trim processing | server/media_editor.py, media_processing.py; media-editor.js | media_editor_*; test_media_editor.py, test_media_processing.py |
 | Gaming IDs, matching and scheduling | server/game_identities.py, gamebox_core.py, match_scheduling.py | gb_*, game_*; test_phase_b.py, test_gamebox_core.py, test_match_scheduling.py |
@@ -145,3 +146,16 @@ At the version 41 baseline, 388 Python tests ran: 375 passed and thirteen errors
 - server.py/MainActivity.kt are still dense. Extract one tested responsibility at a time rather than rewriting either controller.
 
 For future work, update this guide when file ownership or data flow changes, explain non-obvious decisions near the code, and keep behavior fixes separate from readability commits.
+
+## Section settings
+
+Play/Plaza browser settings are rendered by `module-settings.js` over the current
+page. Never route their icons to `/?home=settings`: that recreates Chat and loses
+the current module context. Account colours still use `OrbitPersonalization.mount`
+and `/preferences`; appearance is the existing browser setting. The additional
+section tools invoke existing controls, not new settings APIs. Chat's existing
+menu/panel nodes are reparented to the body without replacing handlers because a
+child z-index cannot escape the fixed header's lower stacking context. Drawers use
+50% viewport width; keyboard Escape and focus remain within the owned drawer.
+Native account/settings overlays likewise use half the viewport.
+

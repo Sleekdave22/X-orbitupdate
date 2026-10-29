@@ -91,7 +91,7 @@ nav.locked [data-tab=admin]:not([hidden]),nav.locked [data-tab=studio]:not([hidd
 .unread-badge{background:var(--violet)!important;color:#fff!important}
 .delivery-status.read{background:var(--cyan)!important;border-color:var(--cyan)!important}
 .delivery-status.delivered{background:var(--violet-text)!important;border-color:var(--violet-text)!important}
-#navigationMenu{position:fixed;top:0;bottom:0;right:0;width:40vw;height:100dvh;max-width:none;min-width:0;z-index:1080;overflow:auto;border-radius:0;background:var(--card)!important;color:var(--ink);border-left:1px solid var(--line);padding:max(12px,env(safe-area-inset-top)) 6px 16px;box-shadow:-16px 0 48px #0003;animation:orbit-drawer-in .23s ease-out}
+#navigationMenu{position:fixed;top:0;bottom:0;right:0;width:50vw;height:100dvh;max-width:none;min-width:0;z-index:1080;overflow:auto;border-radius:0;background:var(--card)!important;color:var(--ink);border-left:1px solid var(--line);padding:max(12px,env(safe-area-inset-top)) 6px 16px;box-shadow:-16px 0 48px #0003;animation:orbit-drawer-in .23s ease-out}
 #navigationMenu button{width:100%;min-width:0;display:flex;align-items:center;text-align:left;gap:8px;padding:10px 5px!important;background:transparent!important;border:0!important;color:var(--ink)!important;font-size:12px;white-space:normal;overflow-wrap:anywhere}
 #navigationMenu #myProfile{flex-direction:row}#navigationMenu #ownAvatar{width:32px;height:32px;flex-shrink:0}
 #navigationMenu #ownName{min-width:0;overflow-wrap:anywhere}#navigationMenu hr{border:0;border-top:1px solid var(--line)}
@@ -310,7 +310,7 @@ html{--wallpaper-soften:linear-gradient(180deg,#6300c659,#001f5959 56%,#00000d59
 html[data-theme=bright]{--wallpaper-soften:linear-gradient(180deg,#d874f880,#1d6fff80 56%,#01d3ed80)}
 #navigationMenu #myProfile{margin-left:0!important;max-width:100%!important;width:100%;justify-content:flex-start;flex-shrink:1;text-align:left}
 #navigationMenu #ownName{flex:1 1 0;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
-#settingsPanel{width:60vw}
+#settingsPanel{width:50vw}
 #marketSettings{background:transparent!important;border:0!important;padding:5px!important;min-width:36px;flex-shrink:0;color:var(--cyan-text)!important}
 
 /* Account pairs drive controls without changing ordinary text or status colours. */
